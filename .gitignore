@@ -1,0 +1,3 @@
+# nothing from the parent folder belongs in the published site
+*.xlsx
+*.json
