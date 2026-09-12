@@ -248,7 +248,7 @@ window.FNWC_SYNC_NO_PILL = true;   /* this app draws its own sync button */
 /* Bumped whenever this file changes, so Settings can tell you which build you
    are actually looking at. Worth having: "is it even the new version?" is
    otherwise impossible to answer from a phone. */
-window.FNWC_BUILD = "2026-09-12e";
+window.FNWC_BUILD = "2026-09-12f";
 
 /* An app on the home screen will otherwise sit on a copy of this page from
    days ago. The worker fetches fresh every time and keeps a copy only for
@@ -278,6 +278,7 @@ if ("serviceWorker" in navigator) {
 <script src="fnwc-followups.js"></script>
 <script src="fnwc-money.js"></script>
 <script src="fnwc-geo.js"></script>
+<script src="fnwc-calibrate.js"></script>
 <script>
 (function () {
   "use strict";
@@ -495,6 +496,7 @@ if ("serviceWorker" in navigator) {
     { id: "customers", ico: "\u{1F464}", label: "Customers" },
     { id: "followups", ico: "\u{1F514}", label: "Follow ups" },
     { id: "money", ico: "\u{1F4B0}", label: "Getting paid" },
+    { id: "pricing", ico: "\u{1F4C8}", label: "Are you charging enough" },
     { sep: true },
     { id: "quote",     ico: "\u{1F4B2}", label: "Quote it" },
     { id: "reply",     ico: "\u{1F4AC}", label: "Reply desk" },
@@ -555,7 +557,8 @@ if ("serviceWorker" in navigator) {
     ({
       today: vToday, diary: vDiary, jobs: vJobs, leads: vLeads,
       customers: vCustomers, followups: vFollowups, money: vMoney,
-      quote: vQuote, reply: vReply, books: vBooks, settings: vSettings
+      pricing: vPricing, quote: vQuote, reply: vReply, books: vBooks,
+      settings: vSettings
     })[view]($("#view"));
   }
 
@@ -839,8 +842,66 @@ if ("serviceWorker" in navigator) {
           x.status = s;
           if (s === "done" && !x.doneDate) x.doneDate = todayISO();
         });
-      })) { closeSheet(); toast("Marked " + STATUS_LABEL[s].toLowerCase()); render(); }
+      })) {
+        closeSheet();
+        toast("Marked " + STATUS_LABEL[s].toLowerCase());
+        /* The one moment the real time is known. Ask now or it is a guess
+           forever, and every quote after it stays a guess too. */
+        if (s === "done" && !(+j.actualMin >= 10)) { timeSheet(id); return; }
+        render();
+      }
     }, $("#sheetBody"));
+  }
+
+  /* Logging the real time has to be quicker than skipping it, or it never
+     happens. Chips around the estimate cover most jobs in one tap. */
+  function timeSheet(jobId) {
+    load();
+    var j = db.jobs.filter(function (x) { return x.id === jobId; })[0];
+    if (!j) { render(); return; }
+    var est = +j.estMin || 90;
+
+    /* Offered around what was quoted, because that is the neighbourhood the
+       answer is in - and rounded to something a person would say out loud. */
+    var opts = [0.5, 0.75, 1.25, 1.5, 2].map(function (m) {
+      return Math.max(15, Math.round(est * m / 15) * 15);
+    });
+    /* The estimate itself is always offered, unrounded - "it took exactly what
+       I said" is a common answer and should be one tap, not typing. */
+    opts.push(est);
+    opts = opts.filter(function (v, i, a) { return a.indexOf(v) === i; })
+               .sort(function (a, b) { return a - b; });
+
+    var h = '<div class="sub">You quoted ' + est + " minutes for " +
+      esc(custName(j.customerId)) + ". How long did it actually take?</div>" +
+      '<div class="wrap mt">' + opts.map(function (m) {
+        return '<button class="chip" data-m="' + m + '">' + fmtMins(m) +
+          (m === est ? " (quoted)" : "") + "</button>";
+      }).join("") + "</div>" +
+      '<div class="mt">' + field("Or type it (minutes)", "tm_min", "number", null, "",
+        ' inputmode="numeric" placeholder="' + est + '"') + "</div>" +
+      '<div class="tiny">This is what makes the quote calculator get better. ' +
+      "Nothing else in here can tell whether your prices work without it.</div>";
+
+    openSheet("How long did that take?", h, [
+      { label: "Skip", on: function () { closeSheet(); render(); } },
+      { label: "Save", cls: "p", on: function () { saveTime(int("tm_min")); } }
+    ]);
+
+    function saveTime(m) {
+      if (!(m >= 1)) { toast("How many minutes?"); return; }
+      if (commit(function (f) { FNWCCalibrate.logTime(f, jobId, m); })) {
+        closeSheet(); toast("Logged " + fmtMins(m)); render();
+      }
+    }
+    on("[data-m]", function (e) { saveTime(parseInt(e.dataset.m, 10)); }, $("#sheetBody"));
+  }
+
+  function fmtMins(m) {
+    m = +m || 0;
+    if (m < 60) return m + "m";
+    var h = Math.floor(m / 60), r = m % 60;
+    return h + "h" + (r ? " " + r + "m" : "");
   }
 
   function editJob(j) {
@@ -1849,6 +1910,129 @@ if ("serviceWorker" in navigator) {
     wireJobCards(root);
   }
 
+  /* ------------------------------------------------------- ARE YOU CHARGING
+     ENOUGH. Every finished job with a real time on it is a completed
+     experiment. This is what they add up to. It states how much it is going on
+     and refuses to guess from three jobs, because a confident wrong answer
+     about your prices is worse than no answer.
+     --------------------------------------------------------------------- */
+
+  var CONF_WORD = { none: "not enough yet", early: "early days", fair: "reasonable", good: "solid" };
+  var CONF_TAG = { none: "bad", early: "warn", fair: "info", good: "good" };
+
+  function vPricing(root) {
+    var r = FNWCCalibrate.report(db);
+    var cov = r.coverage;
+
+    html(root, '<div class="grid3" style="margin-bottom:12px">' +
+      '<div class="stat"><b class="money">' + (r.rate.rate != null ? money(r.rate.rate) : "—") +
+        "</b><span>an hour, real</span></div>" +
+      '<div class="stat"><b class="money">' + money(r.rate.target) + "</b><span>you aimed at</span></div>" +
+      '<div class="stat"><b>' + cov.logged + "/" + cov.total + "</b><span>jobs timed</span></div>" +
+      "</div>");
+
+    html(root, '<div class="card" style="padding:10px 12px;margin-bottom:12px">' +
+      '<div class="rowx"><span class="tiny">Based on ' + cov.logged + " timed job" +
+      (cov.logged === 1 ? "" : "s") + '</span>' +
+      '<span class="tag ' + CONF_TAG[cov.confidence] + '" style="margin-left:auto">' +
+      CONF_WORD[cov.confidence] + "</span></div></div>");
+
+    if (!r.usable) {
+      html(root, '<div class="card">' + empty("\u{1F4C8}", "Not enough to go on yet",
+        cov.needed + " more finished job" + (cov.needed === 1 ? "" : "s") +
+        " with a real time on them and this starts working.") + "</div>");
+      if (cov.missing) drawUntimed(root, FNWCCalibrate.missing(db));
+      return;
+    }
+
+    /* What to do about it, most worth doing first. */
+    r.actions.forEach(function (a) {
+      html(root, '<div class="card" data-act="' + esc(a.kind) + '">' +
+        "<h3>" + esc(a.title) + "</h3>" +
+        '<div class="sub" style="margin-top:6px">' + esc(a.detail) + "</div>" +
+        (a.kind === "time" && a.factor
+          ? '<button class="btn p full mt" data-accept="' + a.factor + '">Use this in quotes</button>'
+          : "") +
+        (a.kind === "travel" ? '<a class="btn full mt" href="#diary">Look at the diary</a>' : "") +
+        "</div>");
+    });
+
+    if (r.appliedFactor !== 1) {
+      html(root, '<div class="card" style="border-color:var(--good)">' +
+        "<h3>Quotes are being padded by " + Math.round((r.appliedFactor - 1) * 100) + "%</h3>" +
+        '<div class="sub mt">The quote screen adds this to its time estimate, so the hourly rate it ' +
+        "shows you is the one you will really get. It does not change the price it quotes.</div>" +
+        '<button class="btn full mt" data-clearfactor>Stop padding</button></div>');
+    }
+
+    /* Where the money is actually made. Averages hide this; it is usually one
+       suburb or one kind of job dragging everything down. */
+    var subs = FNWCCalibrate.bySuburb(db);
+    if (subs.length > 1) {
+      html(root, '<div class="card"><h3>By suburb</h3>' +
+        '<div class="tiny" style="margin:4px 0 8px">Only places with three or more timed jobs.</div>' +
+        subs.map(function (s) {
+          var tag = s.rate >= r.rate.target ? "good" : s.rate >= r.rate.target * 0.8 ? "warn" : "bad";
+          return '<div class="q-line"><span>' + esc(titleCase(s.key)) +
+            ' <span class="tiny">' + s.n + " jobs</span></span>" +
+            '<b><span class="tag ' + tag + '">' + money(s.rate) + "/h</span></b></div>";
+        }).join("") + "</div>");
+    }
+
+    var kinds = FNWCCalibrate.byKind(db);
+    if (kinds.length > 1) {
+      html(root, '<div class="card"><h3>By kind of job</h3>' +
+        kinds.map(function (s) {
+          var tag = s.rate >= r.rate.target ? "good" : s.rate >= r.rate.target * 0.8 ? "warn" : "bad";
+          return '<div class="q-line"><span>' + esc(s.key) +
+            ' <span class="tiny">' + s.n + " jobs</span></span>" +
+            '<b><span class="tag ' + tag + '">' + money(s.rate) + "/h</span></b></div>";
+        }).join("") + "</div>");
+    }
+
+    var o = FNWCCalibrate.outliers(db, 3);
+    if (o.worst.length) {
+      html(root, '<div class="card"><h3>Worst paying jobs</h3>' +
+        '<div class="tiny" style="margin:4px 0 8px">Worth a look. Usually a long drive, or one that ' +
+        "turned out to be a much bigger job than it looked.</div>" +
+        o.worst.map(function (x) {
+          return '<div class="q-line"><span>' + esc(custName(x.job.customerId)) +
+            '<br><span class="tiny">' + esc(niceDate(x.job.date)) +
+            (x.job.suburb ? " &middot; " + esc(x.job.suburb) : "") + "</span></span>" +
+            '<b><span class="tag bad">' + money(x.rate) + "/h</span></b></div>";
+        }).join("") + "</div>");
+    }
+
+    if (cov.missing) drawUntimed(root, FNWCCalibrate.missing(db));
+
+    on("[data-accept]", function (e) {
+      var f = parseFloat(e.dataset.accept);
+      if (commit(function (fdb) { FNWCCalibrate.acceptTimeFactor(fdb, f); })) {
+        toast("Quotes now padded by " + Math.round((f - 1) * 100) + "%"); render();
+      }
+    }, root);
+
+    on("[data-clearfactor]", function () {
+      if (commit(function (fdb) { FNWCCalibrate.clearTimeFactor(fdb); })) {
+        toast("Padding removed"); render();
+      }
+    }, root);
+  }
+
+  function drawUntimed(root, list) {
+    html(root, '<div class="card"><h3>' + list.length + " job" + (list.length === 1 ? "" : "s") +
+      " with no time logged</h3>" +
+      '<div class="tiny" style="margin:4px 0 10px">Each one you fill in sharpens everything above. ' +
+      "Guessing from memory is fine - roughly right beats nothing.</div>" +
+      list.slice(0, 12).map(function (j) {
+        return '<div class="q-line"><span>' + esc(custName(j.customerId)) +
+          '<br><span class="tiny">' + esc(niceDate(j.date)) + " &middot; quoted " +
+          (+j.estMin || 0) + "m</span></span>" +
+          '<button class="btn sm" data-logtime="' + esc(j.id) + '">Log it</button></div>';
+      }).join("") + "</div>");
+    on("[data-logtime]", function (e) { timeSheet(e.dataset.logtime); }, root);
+  }
+
   /* ---------------------------------------------------------------- QUOTE */
 
   var COUNT_IDS = ["gStd", "gLrg", "uWin", "fly", "sec", "trk", "door"];
@@ -1982,12 +2166,20 @@ if ("serviceWorker" in navigator) {
     if (q.condition === "hard") onSite *= TIME.hardMult;
     if (q.condition === "heavy") onSite *= TIME.heavyMult;
 
+    /* The rate card's time estimate, corrected by what jobs actually take.
+       Only the hourly rate shown moves - the price quoted is still the rate
+       card's, because what to charge stays a decision, not a calculation. */
+    var rawOnSite = onSite;
+    onSite = FNWCCalibrate.adjustMinutes(db, onSite);
+    var padded = Math.round(onSite) !== Math.round(rawOnSite);
+
     var travelMins = (q.travel === "far" ? TIME.travelFar : TIME.travelLocal) * 2;
     var totalMins = onSite + travelMins;
     var hourly = totalMins > 0 ? first / (totalMins / 60) : 0;
 
     return { lines: lines, first: first, repeat: repeat, discPct: discPct, floored: floored,
-             base: base, onSite: Math.round(onSite), hourly: hourly, anything: work > 0,
+             base: base, onSite: Math.round(onSite), rawOnSite: Math.round(rawOnSite),
+             padded: padded, hourly: hourly, anything: work > 0,
              windows: n.gStd + n.gLrg + n.uWin };
   }
 
@@ -2017,6 +2209,11 @@ if ("serviceWorker" in navigator) {
         '<span class="tag ' + rateTag + '">' + money(r.hourly) + "/h</span>" +
         '<span class="tag">' + r.windows + " windows</span>" +
       "</div>" +
+      (r.padded
+        ? '<div class="tiny mt">Time padded from ' + r.rawOnSite + " to " + r.onSite +
+          " minutes, because your jobs have been running over. That is why the hourly rate here " +
+          'is lower than the rate card suggests. <a href="#pricing">Why</a></div>'
+        : "") +
       '<div class="grid2 mt">' +
         '<button class="btn" data-qc>Copy the words</button>' +
         '<button class="btn p" data-ql>Save as a lead</button>' +
