@@ -248,7 +248,7 @@ window.FNWC_SYNC_NO_PILL = true;   /* this app draws its own sync button */
 /* Bumped whenever this file changes, so Settings can tell you which build you
    are actually looking at. Worth having: "is it even the new version?" is
    otherwise impossible to answer from a phone. */
-window.FNWC_BUILD = "2026-09-12c";
+window.FNWC_BUILD = "2026-09-12d";
 
 /* An app on the home screen will otherwise sit on a copy of this page from
    days ago. The worker fetches fresh every time and keeps a copy only for
@@ -276,6 +276,7 @@ if ("serviceWorker" in navigator) {
 </script>
 <script src="fnwc-sync.js"></script>
 <script src="fnwc-followups.js"></script>
+<script src="fnwc-money.js"></script>
 <script>
 (function () {
   "use strict";
@@ -492,6 +493,7 @@ if ("serviceWorker" in navigator) {
     { id: "leads",     ico: "\u{1F4E5}", label: "Leads" },
     { id: "customers", ico: "\u{1F464}", label: "Customers" },
     { id: "followups", ico: "\u{1F514}", label: "Follow ups" },
+    { id: "money", ico: "\u{1F4B0}", label: "Getting paid" },
     { sep: true },
     { id: "quote",     ico: "\u{1F4B2}", label: "Quote it" },
     { id: "reply",     ico: "\u{1F4AC}", label: "Reply desk" },
@@ -512,7 +514,8 @@ if ("serviceWorker" in navigator) {
       leads: db.leads.filter(function (l) { return l.stage !== "won" && l.stage !== "lost"; }).length,
       customers: db.customers.length,
       books: db.expenses.length,
-      followups: FNWCFollowUps.summary(db, todayISO()).total
+      followups: FNWCFollowUps.summary(db, todayISO()).total,
+      money: (function () { var m = FNWCMoney.summary(db, todayISO()); return m.unbilled + m.toChase; })()
     };
   }
 
@@ -550,8 +553,8 @@ if ("serviceWorker" in navigator) {
     $("#view").innerHTML = "";
     ({
       today: vToday, diary: vDiary, jobs: vJobs, leads: vLeads,
-      customers: vCustomers, followups: vFollowups, quote: vQuote,
-      reply: vReply, books: vBooks, settings: vSettings
+      customers: vCustomers, followups: vFollowups, money: vMoney,
+      quote: vQuote, reply: vReply, books: vBooks, settings: vSettings
     })[view]($("#view"));
   }
 
@@ -580,8 +583,11 @@ if ("serviceWorker" in navigator) {
       return j.date >= ws && j.date <= t && j.status !== "scheduled" && j.status !== "cancelled";
     });
     var weekMoney = weekDone.reduce(function (s, j) { return s + (+j.price || 0); }, 0);
-    var owed = db.jobs.filter(function (j) { return j.status === "done" || j.status === "invoiced"; })
-                      .reduce(function (s, j) { return s + (+j.price || 0); }, 0);
+    /* Everything earned but not banked - invoices out, plus work finished
+       that has not been billed yet. The two are different problems, but they
+       are the same money as far as the week is concerned. */
+    var mon = FNWCMoney.summary(db, t);
+    var owed = mon.atStake;
     var hot = db.leads.filter(function (l) {
       if (l.stage === "won" || l.stage === "lost") return false;
       var d = daysAgo(l.lastContact || l.received);
@@ -601,6 +607,21 @@ if ("serviceWorker" in navigator) {
       '<button class="btn" data-a="exp">+ Expense</button>' +
       '<a class="btn" href="#quote">Quote it</a>' +
       "</div>");
+
+    /* Money you have earned and not received is the most urgent thing on this
+       screen, so it says so before anything else. */
+    if (mon.overdue || mon.unbilled) {
+      var bits = [];
+      if (mon.overdue) bits.push(money(mon.overdueValue) + " overdue" +
+        (mon.oldest != null ? ", oldest " + mon.oldest + " days" : ""));
+      if (mon.unbilled) bits.push(mon.unbilled + " job" + (mon.unbilled === 1 ? "" : "s") +
+        " finished but not invoiced (" + money(mon.unbilledValue) + ")");
+      html(root, '<a class="card" href="#money" style="display:block;text-decoration:none;color:inherit;' +
+        'border-color:' + (mon.overdue ? "var(--bad)" : "var(--warn)") + '">' +
+        '<div class="spread"><h3>\u{1F4B0} Money waiting on you</h3><span class="tag ' +
+        (mon.overdue ? "bad" : "warn") + '">open</span></div>' +
+        '<div class="sub" style="margin-top:4px">' + esc(bits.join(". ")) + ".</div></a>");
+    }
 
     /* The follow-ups are the thing that quietly makes the money, so they get
        said out loud here rather than waiting to be found in the menu. */
@@ -745,6 +766,18 @@ if ("serviceWorker" in navigator) {
          (j.actualMin ? '<div class="q-line"><span>Actually took</span><b>' + j.actualMin + " min</b></div>" : "") +
          '<div class="q-line"><span>Works out at</span><b class="money">' + money(rate) + "/h</b></div>";
 
+    /* Where this one sits in getting paid. Only shown once an invoice exists,
+       so it does not clutter a job that has not been done yet. */
+    if (FNWCMoney.isInvoiced(j)) {
+      var inv = FNWCMoney.invoicedOn(j), due = FNWCMoney.dueOn(db, j);
+      if (j.invoiceNo) h += '<div class="q-line"><span>Invoice</span><b>' + esc(j.invoiceNo) + "</b></div>";
+      if (inv) h += '<div class="q-line"><span>Invoiced</span><b>' + esc(niceDate(inv)) + "</b></div>";
+      if (due && j.status !== "paid") h += '<div class="q-line"><span>Due</span><b>' + esc(niceDate(due)) + "</b></div>";
+      if (j.paidAt) h += '<div class="q-line"><span>Paid</span><b>' + esc(niceDate(j.paidAt)) + "</b></div>";
+      if (j.reminderCount) h += '<div class="q-line"><span>Chased</span><b>' + j.reminderCount +
+        " time" + (j.reminderCount === 1 ? "" : "s") + "</b></div>";
+    }
+
     h += '<div class="mt"><span class="tiny">Move it to</span><div class="wrap" style="margin-top:7px">' +
       JOB_STATUS.filter(function (s) { return s[0] !== j.status; })
         .map(function (s) { return '<button class="chip" data-s="' + s[0] + '">' + s[1] + "</button>"; }).join("") +
@@ -763,6 +796,15 @@ if ("serviceWorker" in navigator) {
     on("[data-s]", function (e) {
       var s = e.dataset.s;
       if (commit(function (f) {
+        /* Invoiced and paid go through the money engine rather than just
+           setting the word, so the invoice date, number and due date are
+           actually recorded. Without them nothing can work out what is late. */
+        if (s === "invoiced") { FNWCMoney.markInvoiced(f, id, todayISO()); return; }
+        if (s === "paid") {
+          FNWCMoney.markInvoiced(f, id, todayISO());   /* cash jobs skip the invoice */
+          FNWCMoney.markPaid(f, id, todayISO());
+          return;
+        }
         f.jobs.forEach(function (x) {
           if (x.id !== id) return;
           x.status = s;
@@ -1459,6 +1501,204 @@ if ("serviceWorker" in navigator) {
     ]);
   }
 
+  /* ----------------------------------------------------------- GETTING PAID
+     Money already earned, sitting in someone else's bank account. Two halves:
+     work you have not invoiced yet, which is entirely your own doing, and
+     invoices nobody has paid, which is not.
+     --------------------------------------------------------------------- */
+
+  var PAY_TAG = { awaiting: "", due: "info", overdue: "warn", serious: "bad", call: "bad" };
+  var PAY_WORD = { awaiting: "not due yet", due: "due today", overdue: "late",
+                   serious: "well overdue", call: "ring them" };
+
+  function vMoney(root) {
+    var today = todayISO();
+    var tab = state.mt || "chase";
+    var m = FNWCMoney.summary(db, today);
+    var ub = FNWCMoney.unbilled(db, today);
+    var chase = FNWCMoney.toChase(db, today);
+    var owed = FNWCMoney.outstanding(db, today);
+
+    html(root, '<div class="grid3" style="margin-bottom:12px">' +
+      '<div class="stat"><b class="money">' + money(m.owed) + "</b><span>owed to you</span></div>" +
+      '<div class="stat"><b class="money">' + money(m.overdueValue) + "</b><span>overdue</span></div>" +
+      '<div class="stat"><b class="money">' + money(m.unbilledValue) + "</b><span>not invoiced</span></div>" +
+      "</div>");
+
+    if (m.avgDaysToPay != null) {
+      html(root, '<div class="tiny" style="margin-bottom:10px">People take about <b>' +
+        m.avgDaysToPay + " day" + (m.avgDaysToPay === 1 ? "" : "s") + "</b> to pay you" +
+        (m.oldest != null ? ". Your oldest unpaid is <b>" + m.oldest + " days</b> late." : ".") + "</div>");
+    }
+
+    html(root, '<div class="seg" style="margin-bottom:12px">' +
+      '<button data-mt="chase" class="' + (tab === "chase" ? "on" : "") + '">Chase' +
+        (chase.length ? " (" + chase.length + ")" : "") + "</button>" +
+      '<button data-mt="invoice" class="' + (tab === "invoice" ? "on" : "") + '">To invoice' +
+        (ub.length ? " (" + ub.length + ")" : "") + "</button>" +
+      '<button data-mt="owed" class="' + (tab === "owed" ? "on" : "") + '">All owed' +
+        (owed.length ? " (" + owed.length + ")" : "") + "</button>" +
+      "</div>");
+
+    if (tab === "chase") drawChase(root, chase);
+    else if (tab === "invoice") drawUnbilled(root, ub);
+    else drawOwed(root, owed);
+
+    on("[data-mt]", function (e) { state.mt = e.dataset.mt; render(); }, root);
+  }
+
+  function drawUnbilled(root, list) {
+    if (!list.length) {
+      html(root, '<div class="card">' + empty("✅", "Everything is invoiced",
+        "Nothing finished is waiting to be sent out.") + "</div>");
+      return;
+    }
+    html(root, '<div class="tiny" style="margin-bottom:10px">The clock on getting paid does not ' +
+      "start until the invoice goes out. Issuing one here numbers it and sets the due date.</div>");
+
+    list.forEach(function (u) {
+      var c = u.customer;
+      html(root, '<div class="card" data-ub="' + esc(u.job.id) + '">' +
+        '<div class="spread"><h3>' + esc(c ? c.name : "(unknown)") + "</h3>" +
+        '<b class="money">' + money2(u.amount) + "</b></div>" +
+        '<div class="sub" style="margin:6px 0 10px">' + esc(u.why) + "</div>" +
+        (u.job.services ? '<div class="tiny" style="margin-bottom:10px">' + esc(u.job.services) + "</div>" : "") +
+        '<button class="btn p full" data-issue>Issue the invoice</button>' +
+        '<div class="wrap mt">' +
+          '<button class="chip" data-already>Already sent it</button>' +
+          '<button class="chip" data-paidnow>Paid in cash</button>' +
+        "</div></div>");
+    });
+
+    root.querySelectorAll("[data-ub]").forEach(function (card) {
+      var jid = card.dataset.ub;
+      var u = list.filter(function (x) { return x.job.id === jid; })[0];
+
+      card.querySelector("[data-issue]").onclick = function () { issueSheet(u); };
+
+      card.querySelector("[data-already]").onclick = function () {
+        if (commit(function (f) { FNWCMoney.markInvoiced(f, jid, todayISO()); })) {
+          toast("Marked as invoiced"); render();
+        }
+      };
+      card.querySelector("[data-paidnow]").onclick = function () {
+        /* Cash on the day skips the invoice entirely, which is most of the
+           small jobs - it should not need three taps. */
+        if (commit(function (f) {
+          FNWCMoney.markInvoiced(f, jid, todayISO());
+          FNWCMoney.markPaid(f, jid, todayISO());
+        })) { toast("Paid. Nice one"); render(); }
+      };
+    });
+  }
+
+  function issueSheet(u) {
+    var c = u.customer;
+    var no = FNWCMoney.nextInvoiceNo(db);
+    var terms = parseInt((db.settings || {}).invoiceTerms, 10);
+    if (!isFinite(terms)) terms = 7;
+    var due = FNWCMoney._addDays(todayISO(), terms);
+
+    var h = '<div class="spread"><h3>' + esc(c ? c.name : "(unknown)") + "</h3>" +
+      '<b class="money">' + money2(u.amount) + "</b></div>" +
+      '<hr class="sep">' +
+      '<div class="q-line"><span>Invoice number</span><b>' + esc(no) + "</b></div>" +
+      '<div class="q-line"><span>Issued</span><b>' + esc(niceDate(todayISO())) + "</b></div>" +
+      '<div class="q-line"><span>Due</span><b>' + esc(niceDate(due)) + " (" + terms + " days)</b></div>" +
+      (u.job.services ? '<div class="sub mt">' + esc(u.job.services) + "</div>" : "") +
+      '<div class="tiny mt">This records the invoice against the job so it can be chased. ' +
+      "To send a proper printed one, open the invoice maker on the PC and pull this job up - " +
+      "it will already have the number on it.</div>";
+
+    openSheet("Issue invoice", h, [
+      { label: "Cancel", on: closeSheet },
+      { label: "Issue it", cls: "p", on: function () {
+          if (commit(function (f) { FNWCMoney.markInvoiced(f, u.job.id, todayISO(), no); })) {
+            closeSheet(); toast("Invoice " + no + " issued"); render();
+          }
+        } }
+    ]);
+  }
+
+  function drawChase(root, list) {
+    if (!list.length) {
+      html(root, '<div class="card">' + empty("\u{1F44C}", "Nobody to chase",
+        "Nothing is overdue, or everyone late has been reminded in the last week.") + "</div>");
+      return;
+    }
+    html(root, '<div class="tiny" style="margin-bottom:10px">Reminders get firmer as they age. ' +
+      "Anything over a month suggests a call instead, because texts have stopped working by then.</div>");
+
+    list.forEach(function (o) {
+      var c = o.customer;
+      html(root, '<div class="card" data-ch="' + esc(o.job.id) + '">' +
+        '<div class="spread"><h3>' + esc(c ? c.name : "(unknown)") + "</h3>" +
+        '<span class="tag ' + (PAY_TAG[o.state] || "") + '">' + PAY_WORD[o.state] + "</span></div>" +
+        '<div class="rowx" style="margin:6px 0"><b class="money" style="font-size:20px">' + money2(o.amount) + "</b>" +
+          '<span class="tiny" style="margin-left:auto">' + (o.invoiceNo ? esc(o.invoiceNo) + " &middot; " : "") +
+          "due " + esc(niceDate(o.dueAt)) + "</span></div>" +
+        '<div class="sub" style="margin-bottom:10px">' + esc(o.why) +
+          (o.reminders ? " Reminded " + o.reminders + " time" + (o.reminders === 1 ? "" : "s") +
+           ", last " + esc(niceDate(o.remindedAt)) + "." : "") + "</div>" +
+        '<div class="grid2">' +
+          (c && c.phone
+            ? (o.byPhone
+                ? '<a class="btn p" href="tel:' + esc(tel(c.phone)) + '" data-call>Ring them</a>'
+                : '<a class="btn p" href="' + esc(smsLink(c.phone, o.message)) + '" data-text>Send reminder</a>')
+            : '<button class="btn" data-nonum>No phone number</button>') +
+          '<button class="btn" data-copy>Copy text</button>' +
+        "</div>" +
+        '<div class="wrap mt">' +
+          '<button class="chip" data-paid>They paid</button>' +
+          '<button class="chip" data-noted>Chased it</button>' +
+        "</div></div>");
+    });
+
+    root.querySelectorAll("[data-ch]").forEach(function (card) {
+      var jid = card.dataset.ch;
+      var o = list.filter(function (x) { return x.job.id === jid; })[0];
+
+      var chased = function (msg) {
+        if (commit(function (f) { FNWCMoney.markReminded(f, jid, todayISO()); })) { toast(msg); render(); }
+      };
+
+      var t = card.querySelector("[data-text]") || card.querySelector("[data-call]");
+      if (t) t.onclick = function () { setTimeout(function () { chased("Marked as chased"); }, 700); };
+
+      var nn = card.querySelector("[data-nonum]");
+      if (nn) nn.onclick = function () { toast("No number saved - add one on their card"); };
+
+      card.querySelector("[data-copy]").onclick = function () {
+        copy(o.message); chased("Copied, and marked as chased");
+      };
+      card.querySelector("[data-noted]").onclick = function () { chased("Marked as chased"); };
+      card.querySelector("[data-paid]").onclick = function () {
+        if (commit(function (f) { FNWCMoney.markPaid(f, jid, todayISO()); })) {
+          toast("Paid. " + money2(o.amount) + " in"); render();
+        }
+      };
+    });
+  }
+
+  function drawOwed(root, list) {
+    if (!list.length) {
+      html(root, '<div class="card">' + empty("\u{1F3E6}", "Nothing outstanding",
+        "Every invoice you have sent has been paid.") + "</div>");
+      return;
+    }
+    list.forEach(function (o) {
+      var c = o.customer;
+      html(root, '<div class="item" data-job="' + esc(o.job.id) + '"><div class="rowx">' +
+        '<div style="min-width:0"><div class="t">' + esc(c ? c.name : "(unknown)") + "</div>" +
+        '<div class="m">' + (o.invoiceNo ? esc(o.invoiceNo) + " &middot; " : "") +
+        "due " + esc(niceDate(o.dueAt)) + "</div></div>" +
+        '<div class="r"><div style="font-weight:700" class="money">' + money2(o.amount) + "</div>" +
+        '<div class="tag ' + (PAY_TAG[o.state] || "") + '" style="margin-top:5px">' + PAY_WORD[o.state] + "</div>" +
+        "</div></div></div>");
+    });
+    wireJobCards(root);
+  }
+
   /* ---------------------------------------------------------------- QUOTE */
 
   var COUNT_IDS = ["gStd", "gLrg", "uWin", "fly", "sec", "trk", "door"];
@@ -2144,6 +2384,18 @@ if ("serviceWorker" in navigator) {
       "</div>" +
       '<button class="btn p full" id="sSaveFu">Save</button></div>');
 
+    html(root, '<div class="card"><h3>Getting paid</h3>' +
+      '<div class="sub" style="margin-bottom:10px">Bank details go on the bottom of every payment ' +
+      "reminder, so people do not have to go looking for them.</div>" +
+      field("Days to pay", "st_terms", "number", null,
+        db.settings.invoiceTerms == null ? 7 : db.settings.invoiceTerms, ' inputmode="numeric"') +
+      field("Account name", "st_accName", "text", null, db.settings.accName || "") +
+      '<div class="grid2">' +
+        field("BSB", "st_bsb", "text", null, db.settings.bsb || "", ' inputmode="numeric"') +
+        field("Account number", "st_acc", "text", null, db.settings.acc || "", ' inputmode="numeric"') +
+      "</div>" +
+      '<button class="btn p full" id="sSavePay">Save</button></div>');
+
     html(root, '<div class="card"><h3>Backup</h3>' +
       '<div class="sub" style="margin-bottom:10px">A copy of everything, as a file. Worth doing before a big change even with sync on.</div>' +
       '<button class="btn full" id="sExport">Download a backup</button></div>');
@@ -2180,6 +2432,17 @@ if ("serviceWorker" in navigator) {
       }
       Promise.all(jobs)["catch"](function () {})
         .then(function () { location.replace(location.pathname + "?u=" + Date.now()); });
+    };
+
+    document.getElementById("sSavePay").onclick = function () {
+      if (commit(function (f) {
+        f.settings = f.settings || {};
+        var t = int("st_terms");
+        f.settings.invoiceTerms = t >= 0 ? t : 7;
+        f.settings.accName = val("st_accName");
+        f.settings.bsb = val("st_bsb");
+        f.settings.acc = val("st_acc");
+      })) { toast("Saved"); render(); }
     };
 
     document.getElementById("sSaveFu").onclick = function () {
