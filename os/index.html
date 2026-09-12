@@ -1032,15 +1032,80 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
     }
 
     openSheet("Customer", h, [
-      { label: "Book a job", cls: "p", on: function () {
+      { label: "Book job", cls: "p", on: function () {
           closeSheet();
           editJob({ id: "", customerId: c.id, date: todayISO(), suburb: c.suburb || "", services: "",
                     price: "", estMin: "", travelMin: db.settings.travelDefault || 30, km: "",
                     status: "scheduled", actualMin: "" });
           /* editJob treats a record with no id as new, which is what we want. */
         } },
-      { label: "Edit", on: function () { closeSheet(); editCustomer(c); } }
+      { label: "Edit", on: function () { closeSheet(); editCustomer(c); } },
+      { label: "Delete", cls: "d", on: function () { deleteCustomer(c); } }
     ]);
+  }
+
+  /* Deleting a customer is the one delete in here that can damage something
+     else. Jobs point at a customer by id, so removing the customer on its own
+     leaves jobs reading "(unknown)" - here and in Window OS - and the money on
+     them still counts towards the year. So if there are any, say so and make
+     it a deliberate choice which way it goes. */
+  function deleteCustomer(c) {
+    var jobs = db.jobs.filter(function (j) { return j.customerId === c.id; });
+    var worth = jobs.filter(function (j) { return j.status !== "cancelled"; })
+                    .reduce(function (s, j) { return s + (+j.price || 0); }, 0);
+
+    function wipe(alsoJobs) {
+      var ok = commit(function (f) {
+        f.customers = f.customers.filter(function (x) { return x.id !== c.id; });
+        if (alsoJobs) f.jobs = f.jobs.filter(function (x) { return x.customerId !== c.id; });
+      });
+      if (ok) {
+        closeSheet();
+        toast(alsoJobs && jobs.length ? "Customer and " + jobs.length + " job" +
+              (jobs.length === 1 ? "" : "s") + " deleted" : "Customer deleted");
+        render();
+      }
+    }
+
+    if (!jobs.length) {
+      var h0 = "<h3>Delete " + esc(c.name) + "?</h3>" +
+        '<div class="sub mt">They have no jobs against them, so nothing else is affected. ' +
+        "This removes them from the phone and the PC both, and it cannot be undone.</div>";
+      openSheet("Delete customer", h0, [
+        { label: "Cancel", on: function () { custSheet(c.id); } },
+        { label: "Delete", cls: "d", on: function () { wipe(false); } }
+      ]);
+      return;
+    }
+
+    var h = "<h3>Delete " + esc(c.name) + "?</h3>" +
+      '<div class="sub mt">They have <b>' + jobs.length + " job" + (jobs.length === 1 ? "" : "s") +
+      "</b> against them, worth <b>" + money2(worth) + "</b>. Pick what happens to those.</div>" +
+      '<hr class="sep">' +
+      '<div class="card" style="margin-bottom:10px;background:var(--panel2)">' +
+        "<b>Delete the jobs as well</b>" +
+        '<div class="tiny mt">The whole history goes. The ' + money2(worth) +
+        " comes off your figures for those years. Use this for a duplicate or a mistake.</div>" +
+        '<button class="btn d full mt" data-all>Delete the lot</button>' +
+      "</div>" +
+      '<div class="card" style="background:var(--panel2)">' +
+        "<b>Keep the jobs</b>" +
+        '<div class="tiny mt">The money stays in your books, but ' +
+        (jobs.length === 1 ? "that job will read" : "those " + jobs.length + " jobs will read") +
+        ' "(unknown)" from now on, here and in Window OS. Only worth it if you need the income recorded.</div>' +
+        '<button class="btn full mt" data-keep>Delete the customer only</button>' +
+      "</div>";
+
+    openSheet("Delete customer", h, [
+      { label: "Cancel", cls: "p", on: function () { custSheet(c.id); } }
+    ]);
+
+    on("[data-all]", function () {
+      if (confirm("Delete " + c.name + " and all " + jobs.length + " of their jobs?\n\n" +
+                  "This cannot be undone, and it happens on the PC too.")) wipe(true);
+    }, $("#sheetBody"));
+
+    on("[data-keep]", function () { wipe(false); }, $("#sheetBody"));
   }
 
   function editCustomer(c) {
