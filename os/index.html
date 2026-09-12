@@ -248,7 +248,7 @@ window.FNWC_SYNC_NO_PILL = true;   /* this app draws its own sync button */
 /* Bumped whenever this file changes, so Settings can tell you which build you
    are actually looking at. Worth having: "is it even the new version?" is
    otherwise impossible to answer from a phone. */
-window.FNWC_BUILD = "2026-09-12d";
+window.FNWC_BUILD = "2026-09-12e";
 
 /* An app on the home screen will otherwise sit on a copy of this page from
    days ago. The worker fetches fresh every time and keeps a copy only for
@@ -277,6 +277,7 @@ if ("serviceWorker" in navigator) {
 <script src="fnwc-sync.js"></script>
 <script src="fnwc-followups.js"></script>
 <script src="fnwc-money.js"></script>
+<script src="fnwc-geo.js"></script>
 <script>
 (function () {
   "use strict";
@@ -679,14 +680,42 @@ if ("serviceWorker" in navigator) {
       keys.slice(0, 60).forEach(function (d) {
         var list = days[d];
         var take = list.reduce(function (s, j) { return s + (+j.price || 0); }, 0);
-        var mins = list.reduce(function (s, j) { return s + (+j.estMin || 0) + (+j.travelMin || 0); }, 0);
+        var plan = FNWCGeo.planDay(db, d);
+        var hrs = Math.round(plan.totalMinutes / 60 * 10) / 10;
+
         html(root,
           '<div class="spread" style="margin:16px 0 8px">' +
           "<h3>" + esc(niceDate(d)) + "</h3>" +
           '<span class="tiny">' + list.length + " job" + (list.length > 1 ? "s" : "") +
-          " &middot; " + money(take) + " &middot; " + Math.round(mins / 60 * 10) / 10 + "h</span></div>");
+          " &middot; " + money(take) + " &middot; " + hrs + "h</span></div>");
+
+        /* What the driving actually costs, and whether the day is a silly
+           shape. This is the bit nothing used to say out loud. */
+        if (plan.stops.length) {
+          html(root, '<div class="card" style="padding:10px 12px;margin-bottom:9px' +
+            (plan.scattered ? ";border-color:var(--warn)" : "") + '">' +
+            '<div class="wrap">' +
+              '<span class="tag">' + plan.km + " km</span>" +
+              '<span class="tag">' + Math.round(plan.driveMinutes) + " min driving</span>" +
+              '<span class="tag">' + money2(plan.fuelCost) + " fuel</span>" +
+              plan.zones.map(function (z) { return '<span class="tag info">' + esc(z) + "</span>"; }).join("") +
+            "</div>" +
+            (plan.scattered
+              ? '<div class="tiny" style="margin-top:7px;color:var(--warn)">That is a lot of ground for one day. ' +
+                "Doing these in separate runs would cost you less driving.</div>" : "") +
+            (plan.kmSaved > 1
+              ? '<button class="btn sm full mt" data-order="' + esc(d) + '">Best order saves ' +
+                plan.kmSaved + " km</button>" : "") +
+            (plan.unplaced.length
+              ? '<div class="tiny" style="margin-top:7px">' + plan.unplaced.length +
+                " job" + (plan.unplaced.length === 1 ? "" : "s") + " not on the map yet - " +
+                '<a href="#settings">place the suburb</a> to include them.</div>' : "") +
+            "</div>");
+        }
+
         list.forEach(function (j) { html(root, jobCard(j)); });
       });
+      on("[data-order]", function (e) { routeSheet(e.dataset.order); }, root);
     }
     on("[data-a]", function () { editJob(); }, root);
     wireJobCards(root);
@@ -828,6 +857,7 @@ if ("serviceWorker" in navigator) {
       '<div id="jf_newWrap">' + field("New customer name", "jf_name", "text", null, isNew ? "" : "") + "</div>" +
       field("Date", "jf_date", "date", null, j.date) +
       field("Suburb", "jf_sub", "text", null, j.suburb) +
+      '<div id="jf_near" style="margin:-4px 0 12px"></div>' +
       field("What you are doing", "jf_serv", "text", null, j.services, ' placeholder="Windows in &amp; out, screens"') +
       '<div class="grid2">' +
         field("Price $", "jf_price", "number", null, j.price, ' inputmode="decimal" step="1"') +
@@ -877,6 +907,38 @@ if ("serviceWorker" in navigator) {
         } }
     ]);
 
+    /* The most useful thing this app can say while a job is being booked:
+       you are already going near there on Thursday. Nothing saves more
+       driving than putting the job on a day the ute is already pointed that
+       way, and it is only worth saying at the moment the date is chosen. */
+    function suggestDays() {
+      var box = document.getElementById("jf_near");
+      if (!box) return;
+      var sub = val("jf_sub");
+      var chosen = val("jf_date") || todayISO();
+      box.innerHTML = "";
+      if (!sub) return;
+
+      var opts = FNWCGeo.nearbyDays(db, sub, todayISO(), 28).filter(function (o) {
+        return o.date !== chosen && (!isNew || o.job.id !== j.id);
+      });
+      if (!opts.length) return;
+
+      box.innerHTML = '<div class="tiny" style="margin-bottom:6px">You are already near ' +
+        esc(titleCase(FNWCGeo.lookup(sub, db).name)) + " on:</div>" +
+        '<div class="wrap">' + opts.slice(0, 4).map(function (o) {
+          return '<button class="chip" type="button" data-near="' + esc(o.date) + '">' +
+            esc(niceDate(o.date)) + " &middot; " + esc(titleCase(o.suburb)) +
+            " (" + o.km + " km)</button>";
+        }).join("") + "</div>";
+
+      on("[data-near]", function (e2) {
+        document.getElementById("jf_date").value = e2.dataset.near;
+        toast("Moved to " + niceDate(e2.dataset.near));
+        suggestDays();
+      }, box);
+    }
+
     /* The "new customer name" box only makes sense when no customer is picked. */
     var sel = document.getElementById("jf_cust"), wrap = document.getElementById("jf_newWrap");
     var sync = function () { wrap.style.display = sel.value ? "none" : "block"; };
@@ -884,8 +946,13 @@ if ("serviceWorker" in navigator) {
       sync();
       var c = custOf(sel.value);
       if (c && c.suburb && !val("jf_sub")) document.getElementById("jf_sub").value = c.suburb;
+      suggestDays();
     };
     sync();
+
+    document.getElementById("jf_sub").addEventListener("input", suggestDays);
+    document.getElementById("jf_date").addEventListener("change", suggestDays);
+    suggestDays();
   }
 
   /* ---------------------------------------------------------------- LEADS */
@@ -1499,6 +1566,89 @@ if ("serviceWorker" in navigator) {
           }
         } }
     ]);
+  }
+
+  /* The run for one day, in the order that does the least driving. It does not
+     reorder anything in the diary - the jobs have no times on them, so the
+     order is advice, not a schedule. */
+  function routeSheet(dateISO) {
+    var plan = FNWCGeo.planDay(db, dateISO);
+    var base = FNWCGeo.basePoint(db);
+
+    var h = '<div class="wrap" style="margin-bottom:12px">' +
+      '<span class="tag">' + plan.km + " km</span>" +
+      '<span class="tag">' + Math.round(plan.driveMinutes) + " min driving</span>" +
+      '<span class="tag">' + money2(plan.fuelCost) + " fuel</span>" +
+      (plan.kmSaved > 0 ? '<span class="tag good">saves ' + plan.kmSaved + " km</span>" : "") +
+      "</div>";
+
+    h += '<div class="q-line"><span>Start</span><b>' + esc(titleCase(base ? base.name : "base")) + "</b></div>";
+    plan.stops.forEach(function (s, i) {
+      h += '<div class="q-line"><span>' + (i + 1) + ". " +
+           esc(s.customer ? s.customer.name : "(unknown)") + '<br><span class="tiny">' +
+           esc(titleCase(s.suburb)) + "</span></span>" +
+           '<b class="tiny">' + s.kmFromPrevious + " km &middot; " + s.minutesFromPrevious + " min</b></div>";
+    });
+    h += '<div class="q-line"><span>Home</span><b class="tiny">' +
+         (Math.round((plan.km - plan.stops.reduce(function (a, s) { return a + s.kmFromPrevious; }, 0)) * 10) / 10) +
+         " km</b></div>";
+
+    if (plan.unplaced.length) {
+      h += '<div class="tiny mt">Not included, because the map has not heard of them: ' +
+        esc(plan.unplaced.map(function (u) { return u.suburb || "(no suburb)"; }).join(", ")) + ".</div>";
+    }
+    h += '<div class="tiny mt">Driving times are estimates from suburb to suburb. They do not know about ' +
+      "roadworks or the school run, so leave yourself room.</div>";
+
+    openSheet(niceDate(dateISO), h, [
+      { label: "Copy the run", on: function () {
+          var L = ["Run for " + niceDate(dateISO), ""];
+          plan.stops.forEach(function (s, i) {
+            L.push((i + 1) + ". " + (s.customer ? s.customer.name : "(unknown)") +
+                   " - " + titleCase(s.suburb) +
+                   (s.job.services ? " (" + s.job.services + ")" : ""));
+          });
+          L.push("");
+          L.push(plan.km + " km, about " + Math.round(plan.driveMinutes) + " min driving.");
+          copy(L.join("\n"));
+        } },
+      { label: "Close", cls: "p", on: closeSheet }
+    ]);
+  }
+
+  /* Putting an unknown suburb on the map by naming one it sits next to. No
+     coordinates to type, and it only ever has to be done once per place. */
+  function placeSheet(name) {
+    var h = '<div class="sub">The map has not heard of <b>' + esc(titleCase(name)) + "</b>. " +
+      "Name somewhere it is near and it will be treated as being in the same spot.</div>" +
+      field("It is near", "pl_near", "text", null, "",
+        ' list="subList2" placeholder="Trinity Beach"') +
+      '<datalist id="subList2">' + FNWCGeo.suburbNames().map(function (s) {
+        return '<option value="' + esc(titleCase(s)) + '">';
+      }).join("") + "</datalist>" +
+      '<div class="tiny" id="pl_note"></div>';
+
+    openSheet("Place " + titleCase(name), h, [
+      { label: "Cancel", on: closeSheet },
+      { label: "Save", cls: "p", on: function () {
+          var near = val("pl_near");
+          if (!FNWCGeo.lookup(near, db)) { toast("Do not know that one either"); return; }
+          if (commit(function (f) { FNWCGeo.placeSuburb(f, name, near); })) {
+            closeSheet(); toast(titleCase(name) + " is on the map"); render();
+          }
+        } }
+    ]);
+
+    var inp = document.getElementById("pl_near"), note = document.getElementById("pl_note");
+    inp.addEventListener("input", function () {
+      var p = FNWCGeo.lookup(inp.value, db);
+      note.textContent = p ? "Found: " + titleCase(p.name) + " (" + p.zone + ")" : "";
+      note.style.color = "var(--good)";
+    });
+  }
+
+  function titleCase(s) {
+    return String(s || "").replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
   }
 
   /* ----------------------------------------------------------- GETTING PAID
@@ -2384,6 +2534,31 @@ if ("serviceWorker" in navigator) {
       "</div>" +
       '<button class="btn p full" id="sSaveFu">Save</button></div>');
 
+    /* Where the day starts and ends. Every route is measured from here, so a
+       wrong base makes every number on the diary wrong with it. */
+    var unplaced = FNWCGeo.unplacedSuburbs(db);
+    html(root, '<div class="card"><h3>Where you start from</h3>' +
+      '<div class="sub" style="margin-bottom:10px">Driving times and the running order are worked ' +
+      "out from here, so it is worth getting right.</div>" +
+      field("Base suburb", "st_base", "text", null,
+        db.settings.baseSuburb || FNWCGeo.DEFAULTS.baseSuburb, ' list="subList" placeholder="Cairns City"') +
+      '<datalist id="subList">' + FNWCGeo.suburbNames().map(function (s) {
+        return '<option value="' + esc(titleCase(s)) + '">';
+      }).join("") + "</datalist>" +
+      '<div class="tiny" id="st_baseNote"></div>' +
+      '<button class="btn p full mt" id="sSaveBase">Save</button>' +
+      (unplaced.length
+        ? '<hr class="sep"><div class="tiny" style="margin-bottom:8px">The map has not heard of ' +
+          unplaced.length + " suburb" + (unplaced.length === 1 ? "" : "s") +
+          " you have used. Jobs there are left out of the route working.</div>" +
+          unplaced.map(function (u) {
+            return '<div class="q-line"><span>' + esc(titleCase(u.suburb)) +
+              ' <span class="tiny">' + u.count + " job" + (u.count === 1 ? "" : "s") + "</span></span>" +
+              '<button class="btn sm" data-place="' + esc(u.suburb) + '">Place it</button></div>';
+          }).join("")
+        : "") +
+    "</div>");
+
     html(root, '<div class="card"><h3>Getting paid</h3>' +
       '<div class="sub" style="margin-bottom:10px">Bank details go on the bottom of every payment ' +
       "reminder, so people do not have to go looking for them.</div>" +
@@ -2433,6 +2608,28 @@ if ("serviceWorker" in navigator) {
       Promise.all(jobs)["catch"](function () {})
         .then(function () { location.replace(location.pathname + "?u=" + Date.now()); });
     };
+
+    (function () {
+      var input = document.getElementById("st_base");
+      var note = document.getElementById("st_baseNote");
+      var check = function () {
+        var p = FNWCGeo.lookup(input.value, db);
+        note.textContent = p ? "Found: " + titleCase(p.name) + " (" + p.zone + ")"
+                             : "Not a suburb the map knows. Routes will fall back to Cairns City.";
+        note.style.color = p ? "var(--good)" : "var(--warn)";
+      };
+      input.addEventListener("input", check);
+      check();
+    })();
+
+    document.getElementById("sSaveBase").onclick = function () {
+      if (commit(function (f) {
+        f.settings = f.settings || {};
+        f.settings.baseSuburb = val("st_base") || FNWCGeo.DEFAULTS.baseSuburb;
+      })) { toast("Base saved"); render(); }
+    };
+
+    on("[data-place]", function (e) { placeSheet(e.dataset.place); }, root);
 
     document.getElementById("sSavePay").onclick = function () {
       if (commit(function (f) {
