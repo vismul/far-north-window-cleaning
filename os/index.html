@@ -242,7 +242,38 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
 <div id="toast"></div>
 
 <script src="fnwc-firebase-config.js"></script>
-<script>window.FNWC_SYNC_NO_PILL = true;   /* this app draws its own sync button */</script>
+<script>
+window.FNWC_SYNC_NO_PILL = true;   /* this app draws its own sync button */
+
+/* Bumped whenever this file changes, so Settings can tell you which build you
+   are actually looking at. Worth having: "is it even the new version?" is
+   otherwise impossible to answer from a phone. */
+window.FNWC_BUILD = "2026-09-12b";
+
+/* An app on the home screen will otherwise sit on a copy of this page from
+   days ago. The worker fetches fresh every time and keeps a copy only for
+   when there is no signal. */
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () {
+    navigator.serviceWorker.register("sw.js").then(function (reg) {
+      reg.addEventListener("updatefound", function () {
+        var sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener("statechange", function () {
+          /* A new version has landed and an old one was already running -
+             take it now rather than on some unpredictable later launch. */
+          if (sw.state === "installed" && navigator.serviceWorker.controller) {
+            sw.postMessage("skipWaiting");
+            location.reload();
+          }
+        });
+      });
+      /* Also ask on every launch, not just when the browser feels like it. */
+      reg.update();
+    })["catch"](function () { /* no worker is survivable; the app still runs */ });
+  });
+}
+</script>
 <script src="fnwc-sync.js"></script>
 <script>
 (function () {
@@ -1781,6 +1812,12 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
       '<div class="tiny mt">This device is <code>' + esc(FNWCSync.deviceId) + "</code>.</div>" +
     "</div>");
 
+    html(root, '<div class="card"><h3>This app</h3>' +
+      '<div class="q-line"><span>Version</span><b>' + esc(window.FNWC_BUILD || "unknown") + "</b></div>" +
+      '<div class="sub mt">If that does not match what you are expecting after a change, ' +
+      'tap below - it throws away the stored copy and fetches the current one.</div>' +
+      '<button class="btn full mt" id="sForce">Force an update</button></div>');
+
     html(root, '<div class="card"><h3>What is in here</h3>' +
       '<div class="q-line"><span>Customers</span><b>' + db.customers.length + "</b></div>" +
       '<div class="q-line"><span>Jobs</span><b>' + db.jobs.length + "</b></div>" +
@@ -1823,6 +1860,27 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
     if (document.getElementById("sPanel")) {
       document.getElementById("sPanel").onclick = function () { FNWCSync.openPanel(); };
     }
+
+    /* The escape hatch for when a phone is still holding an old copy. It
+       clears the worker's cache and unregisters it, so the next load comes
+       straight off the network. Touches nothing in localStorage - your jobs
+       and receipts are not in there. */
+    document.getElementById("sForce").onclick = function () {
+      toast("Fetching the latest...");
+      var jobs = [];
+      if (window.caches && caches.keys) {
+        jobs.push(caches.keys().then(function (ks) {
+          return Promise.all(ks.map(function (k) { return caches["delete"](k); }));
+        }));
+      }
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+        jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+          return Promise.all(rs.map(function (r) { return r.unregister(); }));
+        }));
+      }
+      Promise.all(jobs)["catch"](function () {})
+        .then(function () { location.replace(location.pathname + "?u=" + Date.now()); });
+    };
 
     document.getElementById("sSaveRates").onclick = function () {
       qset.minSingle = num("st_minS"); qset.minDouble = num("st_minD");
