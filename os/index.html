@@ -248,7 +248,7 @@ window.FNWC_SYNC_NO_PILL = true;   /* this app draws its own sync button */
 /* Bumped whenever this file changes, so Settings can tell you which build you
    are actually looking at. Worth having: "is it even the new version?" is
    otherwise impossible to answer from a phone. */
-window.FNWC_BUILD = "2026-09-12f";
+window.FNWC_BUILD = "2026-09-12g";
 
 /* An app on the home screen will otherwise sit on a copy of this page from
    days ago. The worker fetches fresh every time and keeps a copy only for
@@ -279,6 +279,7 @@ if ("serviceWorker" in navigator) {
 <script src="fnwc-money.js"></script>
 <script src="fnwc-geo.js"></script>
 <script src="fnwc-calibrate.js"></script>
+<script src="fnwc-enquiry.js"></script>
 <script>
 (function () {
   "use strict";
@@ -492,6 +493,7 @@ if ("serviceWorker" in navigator) {
     { id: "today",     ico: "☀", label: "Today" },
     { id: "diary",     ico: "\u{1F4C5}", label: "Diary" },
     { id: "jobs",      ico: "\u{1F9F9}", label: "Jobs" },
+    { id: "inbox",     ico: "\u{1F4EC}", label: "Website inbox" },
     { id: "leads",     ico: "\u{1F4E5}", label: "Leads" },
     { id: "customers", ico: "\u{1F464}", label: "Customers" },
     { id: "followups", ico: "\u{1F514}", label: "Follow ups" },
@@ -518,7 +520,8 @@ if ("serviceWorker" in navigator) {
       customers: db.customers.length,
       books: db.expenses.length,
       followups: FNWCFollowUps.summary(db, todayISO()).total,
-      money: (function () { var m = FNWCMoney.summary(db, todayISO()); return m.unbilled + m.toChase; })()
+      money: (function () { var m = FNWCMoney.summary(db, todayISO()); return m.unbilled + m.toChase; })(),
+      inbox: inboxCache ? inboxCache.length : 0
     };
   }
 
@@ -557,8 +560,8 @@ if ("serviceWorker" in navigator) {
     ({
       today: vToday, diary: vDiary, jobs: vJobs, leads: vLeads,
       customers: vCustomers, followups: vFollowups, money: vMoney,
-      pricing: vPricing, quote: vQuote, reply: vReply, books: vBooks,
-      settings: vSettings
+      pricing: vPricing, inbox: vInbox, quote: vQuote, reply: vReply,
+      books: vBooks, settings: vSettings
     })[view]($("#view"));
   }
 
@@ -1404,6 +1407,113 @@ if ("serviceWorker" in navigator) {
           if (ok) { closeSheet(); toast("Saved"); render(); }
         } }
     ]);
+  }
+
+  /* --------------------------------------------------------- WEBSITE INBOX
+     Enquiries off the website land here, not in the leads list. Everything in
+     here was typed by a stranger, so nothing gets into the books until it has
+     been looked at - which also means the worst a spammer can manage is
+     wasting one tap.
+     --------------------------------------------------------------------- */
+
+  var inboxCache = null, inboxError = null, inboxLoading = false;
+
+  function loadInbox(force) {
+    if (inboxLoading) return;
+    if (inboxCache && !force) return;
+    if (!FNWCSync.isOn()) { inboxError = "signin"; return; }
+    inboxLoading = true;
+    FNWCEnquiry.list(FNWCSync).then(function (list) {
+      inboxCache = list; inboxError = null; inboxLoading = false;
+      if (view === "inbox") render(); else drawNav();
+    })["catch"](function (e) {
+      inboxLoading = false;
+      inboxError = (e && e.message) || "Could not read the inbox";
+      if (view === "inbox") render();
+    });
+  }
+
+  function vInbox(root) {
+    if (!FNWCSync.isOn()) {
+      html(root, '<div class="card">' + empty("\u{1F510}", "Sign in to see the inbox",
+        "Website enquiries are kept in the same place your data syncs through.") + "</div>");
+      html(root, '<button class="btn p full" id="ibSignin">Sign in</button>');
+      document.getElementById("ibSignin").onclick = function () { FNWCSync.openPanel(); };
+      return;
+    }
+
+    html(root, '<div class="rowx" style="margin-bottom:12px">' +
+      '<button class="btn sm" id="ibRefresh">' + (inboxLoading ? "Checking..." : "Check now") + "</button>" +
+      '<span class="tiny" style="margin-left:auto">' +
+      (inboxCache ? inboxCache.length + " waiting" : "") + "</span></div>");
+
+    document.getElementById("ibRefresh").onclick = function () { loadInbox(true); render(); };
+
+    if (inboxError && inboxError !== "signin") {
+      html(root, '<div class="card" style="border-color:var(--warn)">' +
+        "<h3>Could not read the inbox</h3>" +
+        '<div class="sub mt">' + esc(inboxError) + "</div>" +
+        '<div class="tiny mt">If this says permission denied, the Firestore rule for enquiries ' +
+        "has not been added yet. It is written out in SETUP-ENQUIRIES.md.</div></div>");
+      return;
+    }
+
+    if (!inboxCache) {
+      html(root, '<div class="card">' + empty("\u{1F4EC}", "Checking...", "") + "</div>");
+      loadInbox();
+      return;
+    }
+
+    if (!inboxCache.length) {
+      html(root, '<div class="card">' + empty("\u{1F4EC}", "Nothing waiting",
+        "Enquiries from the website land here. You accept them before they become leads.") + "</div>");
+      return;
+    }
+
+    inboxCache.forEach(function (e) {
+      var junk = FNWCEnquiry.looksLikeJunk(e);
+      var est = +e.estimate || 0;
+      html(root, '<div class="card" data-enq="' + esc(e.id) + '"' +
+        (junk ? ' style="opacity:.6"' : "") + ">" +
+        '<div class="spread"><h3>' + esc(e.name || "(no name)") + "</h3>" +
+        (junk ? '<span class="tag bad">looks like junk</span>'
+              : est ? '<span class="tag info">' + money(est) + "</span>" : "") + "</div>" +
+        '<div class="sub" style="margin:4px 0 8px">' +
+          [e.suburb, e.windows ? e.windows + " windows" : "", e.storeys ? e.storeys + " storey" : "", e.sides]
+            .filter(Boolean).map(esc).join(" &middot; ") + "</div>" +
+        (e.notes ? '<div class="tiny" style="margin-bottom:8px">' + esc(e.notes) + "</div>" : "") +
+        '<div class="wrap" style="margin-bottom:10px">' +
+          (e.phone ? '<a class="btn sm" href="tel:' + esc(tel(e.phone)) + '">' + esc(e.phone) + "</a>" : "") +
+          (e.email ? '<a class="btn sm" href="mailto:' + esc(e.email) + '">Email</a>' : "") +
+          (e.sentAt ? '<span class="tag">' + esc(niceDate(String(e.sentAt).slice(0, 10))) + "</span>" : "") +
+        "</div>" +
+        '<div class="grid2">' +
+          '<button class="btn p" data-accept>Add as a lead</button>' +
+          '<button class="btn d" data-bin>Bin it</button>' +
+        "</div></div>");
+    });
+
+    root.querySelectorAll("[data-enq]").forEach(function (card) {
+      var id = card.dataset.enq;
+      var e = inboxCache.filter(function (x) { return x.id === id; })[0];
+
+      card.querySelector("[data-accept]").onclick = function () {
+        var lead = FNWCEnquiry.toLead(e, qset, todayISO(), uid);
+        if (!commit(function (f) { f.leads.push(lead); })) return;
+        /* Off the server once it is safely in the store, not before. */
+        FNWCEnquiry.remove(FNWCSync, id)["catch"](function () {});
+        inboxCache = inboxCache.filter(function (x) { return x.id !== id; });
+        toast("Added to leads"); render();
+      };
+
+      card.querySelector("[data-bin]").onclick = function () {
+        if (!confirm("Bin this enquiry?\n\nIt is gone for good.")) return;
+        FNWCEnquiry.remove(FNWCSync, id).then(function () {
+          inboxCache = inboxCache.filter(function (x) { return x.id !== id; });
+          toast("Binned"); render();
+        })["catch"](function (err) { toast((err && err.message) || "Could not bin it"); });
+      };
+    });
   }
 
   /* ------------------------------------------------------------ FOLLOW UPS
@@ -2899,6 +3009,11 @@ if ("serviceWorker" in navigator) {
   window.addEventListener("storage", function (e) {
     if (e.key === KEY && !sheet.classList.contains("open")) render();
   });
+
+  /* Check for website enquiries in the background, so the count in the menu is
+     right without having to open the inbox to find out. */
+  if (FNWCSync.isOn()) setTimeout(function () { loadInbox(); }, 1500);
+  setInterval(function () { if (!document.hidden && FNWCSync.isOn()) loadInbox(true); }, 180000);
 
   go(location.hash.slice(1) || "today");
 })();

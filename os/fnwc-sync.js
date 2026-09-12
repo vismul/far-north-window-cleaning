@@ -639,6 +639,18 @@
     isOn: function () { var s = authState(); return !!(s && s.refreshToken && configured()); },
     account: function () { var s = authState(); return s ? s.email : null; },
     deviceId: deviceId,
+    /* For the bits that talk to Firestore outside the store sync - reading the
+       website enquiry inbox, mostly. Keeps token handling in one place rather
+       than having a second copy of it drift out of step. */
+    authedFetch: function (path, opts) {
+      if (!configured()) return Promise.reject(new Error("Sync is not set up"));
+      return token().then(function (t) {
+        var o = opts || {};
+        o.headers = Object.assign({ Authorization: "Bearer " + t }, o.headers || {});
+        return fetch("https://firestore.googleapis.com/v1/projects/" + cfg.projectId +
+                     "/databases/(default)/documents/" + path, o);
+      });
+    },
     signOut: signOut,
     status: function () { return { state: statusState, text: statusText }; },
     _merge: mergeDoc                  /* used by the self-test in SETUP-SYNC.md */
