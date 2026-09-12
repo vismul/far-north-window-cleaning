@@ -1,0 +1,15 @@
+{
+  "name": "Far North Window Cleaning",
+  "short_name": "FNWC",
+  "description": "Jobs, leads, quotes and receipts, on the phone.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1220",
+  "theme_color": "#0b1220",
+  "icons": [
+    { "src": "../logo.png", "sizes": "256x256", "type": "image/png", "purpose": "any" },
+    { "src": "../logo.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}

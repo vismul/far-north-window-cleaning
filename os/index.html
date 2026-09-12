@@ -1,0 +1,1816 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>FNWC Mobile</title>
+<meta name="theme-color" content="#0b1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="FNWC">
+<link rel="apple-touch-icon" href="../logo.png">
+<link rel="icon" href="../logo.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+/* ---------------------------------------------------------------------------
+   Far North Window Cleaning - the phone app.
+
+   Same data as the desktop tools, laid out for one thumb in the back of the
+   ute. Everything is sized for a phone first; the desktop layout is the one
+   special case, not the other way round.
+   ------------------------------------------------------------------------- */
+:root{
+  --bg:#0b1220; --panel:#111c2f; --panel2:#16243c; --line:#22334f;
+  --ink:#e8eefb; --dim:#93a4c2; --faint:#64789c;
+  --brand:#38bdf8; --brand2:#0ea5e9;
+  --good:#22c55e; --warn:#f59e0b; --bad:#ef4444;
+  --r:14px;
+  --sat:env(safe-area-inset-top); --sab:env(safe-area-inset-bottom);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%}
+body{
+  background:var(--bg);color:var(--ink);
+  font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
+  overscroll-behavior-y:none;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3,h4{margin:0;line-height:1.25}
+a{color:var(--brand)}
+
+/* ---- shell ---- */
+#app{min-height:100%;display:flex;flex-direction:column}
+
+header#top{
+  position:sticky;top:0;z-index:40;
+  padding:calc(var(--sat) + 8px) 12px 8px;
+  background:rgba(11,18,32,.92);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+  display:flex;align-items:center;gap:10px;
+}
+#burger{
+  width:42px;height:42px;flex:none;border:1px solid var(--line);border-radius:11px;
+  background:var(--panel);display:grid;place-items:center;cursor:pointer
+}
+#burger span{display:block;width:17px;height:2px;background:var(--ink);border-radius:2px;box-shadow:0 -5px 0 var(--ink),0 5px 0 var(--ink)}
+#title{font-size:17px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#syncBtn{
+  flex:none;border:1px solid var(--line);background:var(--panel);border-radius:999px;
+  padding:8px 11px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--dim);cursor:pointer
+}
+#syncBtn .dot{width:8px;height:8px;border-radius:50%;background:var(--faint);flex:none}
+#syncBtn.ok .dot{background:var(--good)}
+#syncBtn.busy .dot{background:var(--brand);animation:pulse 1s infinite}
+#syncBtn.err .dot{background:var(--bad)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+#syncBtn .lbl{display:none}
+@media(min-width:400px){#syncBtn .lbl{display:inline}}
+
+main{flex:1;padding:12px 12px calc(var(--sab) + 28px);max-width:760px;width:100%;margin:0 auto}
+
+/* ---- sidebar ---- */
+#scrim{position:fixed;inset:0;background:rgba(2,6,16,.6);z-index:50;opacity:0;pointer-events:none;transition:opacity .2s}
+body.nav #scrim{opacity:1;pointer-events:auto}
+nav#side{
+  position:fixed;top:0;left:0;bottom:0;width:265px;max-width:84vw;z-index:60;
+  background:var(--panel);border-right:1px solid var(--line);
+  transform:translateX(-100%);transition:transform .22s cubic-bezier(.3,.7,.3,1);
+  display:flex;flex-direction:column;
+  padding-top:var(--sat);padding-bottom:var(--sab);
+}
+body.nav nav#side{transform:none}
+#side .brand{padding:16px 16px 12px;border-bottom:1px solid var(--line)}
+#side .brand b{display:block;font-size:16px}
+#side .brand small{color:var(--faint);font-size:12px}
+#side .list{flex:1;overflow-y:auto;padding:8px}
+#side a.nav{
+  display:flex;align-items:center;gap:12px;padding:13px 12px;border-radius:11px;
+  color:var(--ink);text-decoration:none;font-weight:600;font-size:15px
+}
+#side a.nav .ico{width:22px;text-align:center;font-size:17px;flex:none;opacity:.9}
+#side a.nav .cnt{margin-left:auto;background:var(--panel2);border:1px solid var(--line);border-radius:999px;
+  padding:1px 8px;font-size:11px;color:var(--dim);font-weight:700}
+#side a.nav.on{background:var(--brand2);color:#04121f}
+#side a.nav.on .cnt{background:rgba(0,0,0,.2);border-color:transparent;color:#04121f}
+#side .sep{height:1px;background:var(--line);margin:8px 10px}
+#side .foot{padding:10px 16px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--faint)}
+
+@media(min-width:900px){
+  body{display:block}
+  nav#side{transform:none;box-shadow:none}
+  #app{margin-left:265px}
+  #burger,#scrim{display:none}
+  main{padding-left:20px;padding-right:20px}
+}
+
+/* ---- building blocks ---- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.card h3{font-size:15px;margin-bottom:2px}
+.sub{color:var(--dim);font-size:13px}
+.tiny{color:var(--faint);font-size:12px}
+.rowx{display:flex;gap:10px;align-items:center}
+.spread{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.wrap{display:flex;flex-wrap:wrap;gap:8px}
+.mt{margin-top:12px}
+
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.stat b{display:block;font-size:22px;font-weight:700;letter-spacing:-.4px}
+.stat span{color:var(--dim);font-size:12px}
+
+.btn{
+  appearance:none;border:1px solid var(--line);background:var(--panel2);color:var(--ink);
+  border-radius:11px;padding:12px 14px;font-weight:600;font-size:15px;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px
+}
+a.btn{text-decoration:none;color:var(--ink)}
+a.btn.p{color:#04121f}
+.btn:active{transform:translateY(1px)}
+.btn.p{background:var(--brand2);border-color:var(--brand2);color:#04121f}
+.btn.g{background:var(--good);border-color:var(--good);color:#05210f}
+.btn.d{color:#fca5a5}
+.btn.sm{padding:8px 11px;font-size:13px;min-height:38px;border-radius:9px}
+.btn.full{width:100%}
+.btn[disabled]{opacity:.45;pointer-events:none}
+
+label.f{display:block;margin-bottom:10px}
+label.f span{display:block;font-size:12px;color:var(--dim);margin-bottom:5px;font-weight:600}
+.in{
+  width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;
+  padding:12px;font-size:16px;   /* 16px stops iOS zooming on focus */
+}
+.in:focus{outline:none;border-color:var(--brand)}
+textarea.in{min-height:110px;resize:vertical;line-height:1.5}
+select.in{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--dim) 50%),linear-gradient(135deg,var(--dim) 50%,transparent 50%);
+  background-position:calc(100% - 17px) 50%,calc(100% - 12px) 50%;background-size:5px 5px;background-repeat:no-repeat;padding-right:34px}
+
+.item{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--r);
+  padding:13px;margin-bottom:9px;cursor:pointer
+}
+.item .t{font-weight:700;font-size:15px}
+.item .m{color:var(--dim);font-size:13px;margin-top:2px}
+.item .r{margin-left:auto;text-align:right;flex:none}
+
+.tag{
+  display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700;
+  background:var(--panel2);border:1px solid var(--line);color:var(--dim);white-space:nowrap
+}
+.tag.good{background:rgba(34,197,94,.14);border-color:rgba(34,197,94,.4);color:#86efac}
+.tag.warn{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.4);color:#fcd34d}
+.tag.bad{background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.4);color:#fca5a5}
+.tag.info{background:rgba(56,189,248,.14);border-color:rgba(56,189,248,.4);color:#7dd3fc}
+
+.empty{text-align:center;padding:34px 16px;color:var(--faint)}
+.empty .big{font-size:34px;margin-bottom:8px;opacity:.5}
+
+.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:3px;gap:3px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.seg button{flex:1 0 auto;border:0;background:transparent;color:var(--dim);padding:9px 12px;border-radius:8px;font-weight:600;font-size:13px;white-space:nowrap;cursor:pointer}
+.seg button.on{background:var(--brand2);color:#04121f}
+
+.chip{border:1px solid var(--line);background:var(--panel2);color:var(--dim);border-radius:999px;padding:8px 13px;font-size:13px;font-weight:600;cursor:pointer}
+.chip.on{background:var(--brand2);border-color:var(--brand2);color:#04121f}
+
+/* ---- sheet (the slide-up editor) ---- */
+#sheet{position:fixed;inset:0;z-index:70;display:none}
+#sheet.open{display:block}
+#sheet .bg{position:absolute;inset:0;background:rgba(2,6,16,.68)}
+#sheet .pane{
+  position:absolute;left:0;right:0;bottom:0;max-height:92%;
+  background:var(--panel);border-radius:18px 18px 0 0;border-top:1px solid var(--line);
+  display:flex;flex-direction:column;animation:up .24s cubic-bezier(.3,.8,.3,1)
+}
+@keyframes up{from{transform:translateY(100%)}}
+#sheet .head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+#sheet .head h3{flex:1;font-size:16px}
+#sheet .body{padding:14px 16px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#sheet .foot{padding:12px 16px calc(12px + var(--sab));border-top:1px solid var(--line);display:flex;gap:9px}
+#sheet .foot .btn{flex:1}
+@media(min-width:900px){
+  #sheet .pane{left:50%;bottom:auto;top:50%;transform:translate(-50%,-50%);width:520px;border-radius:18px;border:1px solid var(--line);animation:none}
+}
+
+#toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sab) + 20px);z-index:90;
+  background:#e8eefb;color:#0b1220;padding:11px 17px;border-radius:999px;font-weight:700;font-size:14px;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .2s
+}
+#toast.show{opacity:1}
+
+.money{font-variant-numeric:tabular-nums}
+hr.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
+.q-line{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--line);font-size:14px}
+.q-line:last-child{border-bottom:0}
+.q-total{font-size:34px;font-weight:800;letter-spacing:-1px;margin:6px 0 0}
+
+.stepper{display:flex;align-items:center;gap:0;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:var(--bg)}
+.stepper button{width:48px;min-height:48px;border:0;background:var(--panel2);color:var(--ink);font-size:22px;font-weight:600;cursor:pointer}
+.stepper input{flex:1;width:100%;min-width:0;border:0;background:transparent;text-align:center;font-size:17px;font-weight:700;padding:12px 0}
+.stepper input:focus{outline:none}
+</style>
+</head>
+<body>
+
+<div id="scrim"></div>
+
+<nav id="side">
+  <div class="brand">
+    <b>Far North Window Cleaning</b>
+    <small>Cairns &middot; on the phone</small>
+  </div>
+  <div class="list" id="navList"></div>
+  <div class="foot" id="navFoot"></div>
+</nav>
+
+<div id="app">
+  <header id="top">
+    <button id="burger" aria-label="Menu"><span></span></button>
+    <div id="title">Today</div>
+    <button id="syncBtn"><span class="dot"></span><span class="lbl">Sync</span></button>
+  </header>
+  <main id="view"></main>
+</div>
+
+<div id="sheet"><div class="bg"></div><div class="pane">
+  <div class="head"><h3 id="sheetTitle"></h3><button class="btn sm" id="sheetX">Close</button></div>
+  <div class="body" id="sheetBody"></div>
+  <div class="foot" id="sheetFoot"></div>
+</div></div>
+
+<div id="toast"></div>
+
+<script src="fnwc-firebase-config.js"></script>
+<script>window.FNWC_SYNC_NO_PILL = true;   /* this app draws its own sync button */</script>
+<script src="fnwc-sync.js"></script>
+<script>
+(function () {
+  "use strict";
+
+  /* =========================================================================
+     STORE
+     Byte for byte the same shape the desktop tools use, so a record made here
+     opens there and the other way round. fnwc-sync.js keeps the two copies
+     level; this file never talks to Firestore itself.
+     ====================================================================== */
+
+  var KEY = "fnwc-os-v1";
+  var QKEY = "fnwc-quoter-v2";
+
+  var OS_DEFAULTS = {
+    targetRate: 90, hoursPerDay: 7, daysPerWeek: 5,
+    fuelPerKm: 0.28, consumablesPct: 3, feePct: 0,
+    travelDefault: 30, quoteChase: 2, quoteDead: 21,
+    dueSoon: 21, atRisk: 1.6, reviewAfter: 2
+  };
+
+  /* Liam's rate card - identical to quote-calculator.html. */
+  var Q_DEFAULTS = {
+    minSingle: 150, minDouble: 250,
+    stdOut: 9, stdBoth: 13, lrgOut: 12, lrgBoth: 18, upOut: 12, upBoth: 16,
+    flyscreen: 4, securityScreen: 5, track: 4, slidingDoor: 20,
+    hardPct: 25, heavyPct: 37.5, travelFee: 70,
+    discQ: 12, discH: 6, targetRate: 90, gst: false
+  };
+  var TIME = {
+    setup: 20, stdOut: 3.5, stdBoth: 7.5, lrgOut: 5, lrgBoth: 10,
+    upOut: 5, upBoth: 9, flyscreen: 3, securityScreen: 4, track: 2.5,
+    slidingDoor: 6, hardMult: 1.3, heavyMult: 1.5, travelLocal: 15, travelFar: 50
+  };
+
+  var CATS = ["Fuel", "Vehicle & rego", "Equipment & tools", "Consumables",
+              "Insurance", "Phone & internet", "Advertising", "Safety gear",
+              "Accounting & fees", "Training", "Other"];
+
+  var db = { v: 1, demo: false, settings: {}, leads: [], jobs: [], customers: [], expenses: [] };
+  var qset = {};
+
+  var canStore = (function () {
+    try { localStorage.setItem("__p", "1"); var o = localStorage.getItem("__p") === "1"; localStorage.removeItem("__p"); return o; }
+    catch (e) { return false; }
+  })();
+
+  function load() {
+    db = { v: 1, demo: false, settings: {}, leads: [], jobs: [], customers: [], expenses: [] };
+    if (canStore) {
+      try {
+        var d = JSON.parse(localStorage.getItem(KEY) || "null");
+        if (d) {
+          /* Carry across anything this app does not itself use, exactly as the
+             desktop tools do - otherwise a save here would drop it. */
+          Object.keys(d).forEach(function (k) { db[k] = d[k]; });
+          db.leads = d.leads || []; db.jobs = d.jobs || [];
+          db.customers = d.customers || []; db.expenses = d.expenses || [];
+        }
+      } catch (e) {}
+      try { qset = JSON.parse(localStorage.getItem(QKEY) || "null") || {}; } catch (e) { qset = {}; }
+    }
+    db.settings = Object.assign({}, OS_DEFAULTS, db.settings || {});
+    qset = Object.assign({}, Q_DEFAULTS, qset);
+  }
+
+  /* Every write re-reads first. Sync can have replaced the store between the
+     moment a form opened and the moment Save was tapped, and a blind write
+     would throw away whatever came in from the PC in between. */
+  function commit(fn) {
+    if (!canStore) {
+      toast("This browser is blocking storage");
+      alert("Your browser is blocking storage, so nothing you enter can be kept.\n\n" +
+            "On iPhone this usually means Private Browsing. Open this page in a normal tab.");
+      return false;
+    }
+    load();
+    fn(db);
+    try {
+      localStorage.setItem(KEY, JSON.stringify(db));
+      return true;
+    } catch (e) {
+      alert("That could NOT be saved - storage is full.\n\n" +
+            "Open the Books on the PC and clear out some old receipt photos.");
+      return false;
+    }
+  }
+
+  function saveQ() {
+    if (!canStore) return;
+    try { localStorage.setItem(QKEY, JSON.stringify(qset)); } catch (e) {}
+  }
+
+  /* ---- bits and pieces ---- */
+
+  function uid() { return Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
+  function todayISO() { var d = new Date(); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function pad(n) { return (n < 10 ? "0" : "") + n; }
+  function money(n) { return "$" + (Math.round((+n || 0) * 100) / 100).toLocaleString("en-AU", { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+  function money2(n) { return "$" + (+n || 0).toFixed(2); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function daysBetween(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000); }
+  function daysAgo(iso) { return iso ? daysBetween(iso, todayISO()) : null; }
+  function addDays(iso, n) { var d = new Date(iso); d.setDate(d.getDate() + n); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function niceDate(iso) {
+    if (!iso) return "";
+    var d = new Date(iso + "T00:00:00");
+    if (isNaN(d)) return iso;
+    var t = todayISO();
+    if (iso === t) return "Today";
+    if (iso === addDays(t, 1)) return "Tomorrow";
+    if (iso === addDays(t, -1)) return "Yesterday";
+    return d.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+  }
+  function custName(id) {
+    var c = db.customers.filter(function (x) { return x.id === id; })[0];
+    return c ? c.name : "(unknown)";
+  }
+  function custOf(id) { return db.customers.filter(function (x) { return x.id === id; })[0] || null; }
+  function tel(p) { return String(p || "").replace(/[^0-9+]/g, ""); }
+
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+
+  function toast(msg) {
+    var t = $("#toast");
+    t.textContent = msg; t.classList.add("show");
+    clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove("show"); }, 2000);
+  }
+
+  function copy(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast("Copied"); },
+        function () { fallbackCopy(text); });
+    } else fallbackCopy(text);
+  }
+  function fallbackCopy(text) {
+    var ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("style", "position:fixed;top:0;left:0;opacity:0");
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, 999999);
+    try { document.execCommand("copy"); toast("Copied"); } catch (e) { toast("Could not copy"); }
+    ta.remove();
+  }
+
+  /* =========================================================================
+     SHEET - the slide-up form used by every "add" and "edit" in the app
+     ====================================================================== */
+
+  var sheet = $("#sheet");
+
+  function openSheet(title, bodyHTML, buttons) {
+    $("#sheetTitle").textContent = title;
+    $("#sheetBody").innerHTML = bodyHTML;
+    var foot = $("#sheetFoot");
+    foot.innerHTML = "";
+    (buttons || []).forEach(function (b) {
+      var el = document.createElement("button");
+      el.className = "btn " + (b.cls || "");
+      el.textContent = b.label;
+      el.onclick = b.on;
+      foot.appendChild(el);
+    });
+    sheet.classList.add("open");
+    document.body.style.overflow = "hidden";
+  }
+  function closeSheet() {
+    sheet.classList.remove("open");
+    document.body.style.overflow = "";
+  }
+  $("#sheetX").onclick = closeSheet;
+  $("#sheet .bg").onclick = closeSheet;
+
+  function field(label, id, type, opts, value, extra) {
+    var v = value == null ? "" : value;
+    var h = '<label class="f"><span>' + esc(label) + "</span>";
+    if (type === "select") {
+      h += '<select class="in" id="' + id + '">';
+      opts.forEach(function (o) {
+        var val = o[0], lab = o[1];
+        h += '<option value="' + esc(val) + '"' + (String(v) === String(val) ? " selected" : "") + ">" + esc(lab) + "</option>";
+      });
+      h += "</select>";
+    } else if (type === "textarea") {
+      h += '<textarea class="in" id="' + id + '"' + (extra || "") + ">" + esc(v) + "</textarea>";
+    } else {
+      h += '<input class="in" id="' + id + '" type="' + type + '" value="' + esc(v) + '"' + (extra || "") + ">";
+    }
+    return h + "</label>";
+  }
+  function val(id) { var e = document.getElementById(id); return e ? e.value.trim() : ""; }
+  function num(id) { return parseFloat(val(id)) || 0; }
+  function int(id) { return parseInt(val(id), 10) || 0; }
+
+  /* =========================================================================
+     VIEWS
+     ====================================================================== */
+
+  var NAV = [
+    { id: "today",     ico: "☀", label: "Today" },
+    { id: "diary",     ico: "\u{1F4C5}", label: "Diary" },
+    { id: "jobs",      ico: "\u{1F9F9}", label: "Jobs" },
+    { id: "leads",     ico: "\u{1F4E5}", label: "Leads" },
+    { id: "customers", ico: "\u{1F464}", label: "Customers" },
+    { sep: true },
+    { id: "quote",     ico: "\u{1F4B2}", label: "Quote it" },
+    { id: "reply",     ico: "\u{1F4AC}", label: "Reply desk" },
+    { id: "books",     ico: "\u{1F4D2}", label: "The books" },
+    { sep: true },
+    { id: "settings",  ico: "⚙", label: "Settings & sync" }
+  ];
+
+  var view = "today";
+  var state = {};                 /* per-view scratch, cleared on navigation */
+
+  function counts() {
+    var t = todayISO();
+    return {
+      today: db.jobs.filter(function (j) { return j.date === t && j.status === "scheduled"; }).length,
+      diary: db.jobs.filter(function (j) { return j.status === "scheduled" && j.date >= t; }).length,
+      jobs: db.jobs.length,
+      leads: db.leads.filter(function (l) { return l.stage !== "won" && l.stage !== "lost"; }).length,
+      customers: db.customers.length,
+      books: db.expenses.length
+    };
+  }
+
+  function drawNav() {
+    var c = counts(), h = "";
+    NAV.forEach(function (n) {
+      if (n.sep) { h += '<div class="sep"></div>'; return; }
+      var badge = c[n.id];
+      h += '<a class="nav' + (view === n.id ? " on" : "") + '" href="#' + n.id + '">' +
+           '<span class="ico">' + n.ico + "</span>" + esc(n.label) +
+           (badge ? '<span class="cnt">' + badge + "</span>" : "") + "</a>";
+    });
+    $("#navList").innerHTML = h;
+    $("#navFoot").innerHTML = FNWCSync.isOn()
+      ? "Synced with the PC<br>" + esc(FNWCSync.account() || "")
+      : 'Not syncing. <a href="#settings">Turn it on</a>';
+  }
+
+  function go(id) {
+    if (!id) id = "today";
+    if (!NAV.some(function (n) { return n.id === id; })) id = "today";
+    if (id !== view) state = {};
+    view = id;
+    document.body.classList.remove("nav");
+    closeSheet();
+    render();
+    window.scrollTo(0, 0);
+  }
+
+  function render() {
+    load();
+    drawNav();
+    var n = NAV.filter(function (x) { return x.id === view; })[0];
+    $("#title").textContent = n ? n.label : "FNWC";
+    $("#view").innerHTML = "";
+    ({
+      today: vToday, diary: vDiary, jobs: vJobs, leads: vLeads,
+      customers: vCustomers, quote: vQuote, reply: vReply,
+      books: vBooks, settings: vSettings
+    })[view]($("#view"));
+  }
+
+  function html(parent, s) { parent.insertAdjacentHTML("beforeend", s); }
+  function on(sel, fn, root) {
+    (root || document).querySelectorAll(sel).forEach(function (e) { e.onclick = function (ev) { fn(e, ev); }; });
+  }
+  function empty(icon, title, note) {
+    return '<div class="empty"><div class="big">' + icon + "</div><b>" + esc(title) + "</b>" +
+           (note ? '<div class="tiny mt">' + esc(note) + "</div>" : "") + "</div>";
+  }
+
+  /* ---------------------------------------------------------------- TODAY */
+
+  function weekStart() {
+    var d = new Date(); var day = (d.getDay() + 6) % 7;   /* Monday = 0 */
+    d.setDate(d.getDate() - day);
+    return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  }
+
+  function vToday(root) {
+    var t = todayISO(), ws = weekStart();
+    var todays = db.jobs.filter(function (j) { return j.date === t; })
+                        .sort(function (a, b) { return (a.suburb || "").localeCompare(b.suburb || ""); });
+    var weekDone = db.jobs.filter(function (j) {
+      return j.date >= ws && j.date <= t && j.status !== "scheduled" && j.status !== "cancelled";
+    });
+    var weekMoney = weekDone.reduce(function (s, j) { return s + (+j.price || 0); }, 0);
+    var owed = db.jobs.filter(function (j) { return j.status === "done" || j.status === "invoiced"; })
+                      .reduce(function (s, j) { return s + (+j.price || 0); }, 0);
+    var hot = db.leads.filter(function (l) {
+      if (l.stage === "won" || l.stage === "lost") return false;
+      var d = daysAgo(l.lastContact || l.received);
+      return d != null && d >= (db.settings.quoteChase || 2);
+    });
+
+    html(root,
+      '<div class="grid3" style="margin-bottom:12px">' +
+        '<div class="stat"><b>' + todays.filter(function (j) { return j.status === "scheduled"; }).length + "</b><span>on today</span></div>" +
+        '<div class="stat"><b class="money">' + money(weekMoney) + "</b><span>this week</span></div>" +
+        '<div class="stat"><b class="money">' + money(owed) + "</b><span>owed to you</span></div>" +
+      "</div>");
+
+    html(root, '<div class="wrap" style="margin-bottom:14px">' +
+      '<button class="btn p" data-a="job">+ Job</button>' +
+      '<button class="btn" data-a="lead">+ Lead</button>' +
+      '<button class="btn" data-a="exp">+ Expense</button>' +
+      '<a class="btn" href="#quote">Quote it</a>' +
+      "</div>");
+
+    html(root, "<h3 style=\"margin-bottom:8px\">" + niceDate(t) + "</h3>");
+    if (!todays.length) {
+      html(root, '<div class="card">' + empty("\u{1F334}", "Nothing booked today",
+        "Tap + Job to put something in, or open the Diary to see what is coming up.") + "</div>");
+    } else {
+      todays.forEach(function (j) { html(root, jobCard(j)); });
+    }
+
+    if (hot.length) {
+      html(root, '<h3 style="margin:18px 0 8px">Needs a chase <span class="tag warn">' + hot.length + "</span></h3>");
+      hot.slice(0, 5).forEach(function (l) { html(root, leadCard(l)); });
+    }
+
+    on("[data-a]", function (e) {
+      ({ job: editJob, lead: editLead, exp: editExpense })[e.dataset.a]();
+    }, root);
+    wireJobCards(root);
+    wireLeadCards(root);
+  }
+
+  /* ---------------------------------------------------------------- DIARY */
+
+  function vDiary(root) {
+    var t = todayISO();
+    var days = {};
+    db.jobs.forEach(function (j) {
+      if (j.status === "cancelled") return;
+      if (!j.date || j.date < t) return;
+      (days[j.date] = days[j.date] || []).push(j);
+    });
+    var keys = Object.keys(days).sort();
+
+    html(root, '<button class="btn p full" data-a="job" style="margin-bottom:14px">+ Book a job in</button>');
+
+    if (!keys.length) {
+      html(root, '<div class="card">' + empty("\u{1F4C5}", "Diary is clear",
+        "Nothing booked from today onwards.") + "</div>");
+    } else {
+      keys.slice(0, 60).forEach(function (d) {
+        var list = days[d];
+        var take = list.reduce(function (s, j) { return s + (+j.price || 0); }, 0);
+        var mins = list.reduce(function (s, j) { return s + (+j.estMin || 0) + (+j.travelMin || 0); }, 0);
+        html(root,
+          '<div class="spread" style="margin:16px 0 8px">' +
+          "<h3>" + esc(niceDate(d)) + "</h3>" +
+          '<span class="tiny">' + list.length + " job" + (list.length > 1 ? "s" : "") +
+          " &middot; " + money(take) + " &middot; " + Math.round(mins / 60 * 10) / 10 + "h</span></div>");
+        list.forEach(function (j) { html(root, jobCard(j)); });
+      });
+    }
+    on("[data-a]", function () { editJob(); }, root);
+    wireJobCards(root);
+  }
+
+  /* ----------------------------------------------------------------- JOBS */
+
+  var JOB_STATUS = [["scheduled", "Booked in"], ["done", "Done"], ["invoiced", "Invoiced"],
+                    ["paid", "Paid"], ["cancelled", "Cancelled"]];
+  var STATUS_TAG = { scheduled: "info", done: "warn", invoiced: "warn", paid: "good", cancelled: "" };
+  var STATUS_LABEL = { scheduled: "Booked in", done: "Done", invoiced: "Invoiced", paid: "Paid", cancelled: "Cancelled" };
+
+  function jobCard(j) {
+    var c = custOf(j.customerId);
+    var mins = (+j.estMin || 0) + (+j.travelMin || 0);
+    var rate = mins > 0 ? (+j.price || 0) / (mins / 60) : 0;
+    return '<div class="item" data-job="' + esc(j.id) + '">' +
+      '<div class="rowx"><div style="min-width:0">' +
+        '<div class="t">' + esc(c ? c.name : "(unknown)") + "</div>" +
+        '<div class="m">' + esc(niceDate(j.date)) + (j.suburb ? " &middot; " + esc(j.suburb) : "") + "</div>" +
+        (j.services ? '<div class="m">' + esc(j.services) + "</div>" : "") +
+      "</div>" +
+      '<div class="r"><div style="font-weight:700" class="money">' + money(j.price) + "</div>" +
+        '<div class="tag ' + (STATUS_TAG[j.status] || "") + '" style="margin-top:5px">' + esc(STATUS_LABEL[j.status] || j.status) + "</div>" +
+        (rate > 0 ? '<div class="tiny" style="margin-top:4px">' + money(rate) + "/h</div>" : "") +
+      "</div></div></div>";
+  }
+
+  function wireJobCards(root) {
+    on("[data-job]", function (e) { jobSheet(e.dataset.job); }, root);
+  }
+
+  function vJobs(root) {
+    var filt = state.f || "all";
+    html(root, '<div class="seg" style="margin-bottom:12px">' +
+      [["all", "All"], ["scheduled", "Booked"], ["done", "Done"], ["invoiced", "Invoiced"], ["paid", "Paid"]]
+        .map(function (o) { return '<button data-f="' + o[0] + '" class="' + (filt === o[0] ? "on" : "") + '">' + o[1] + "</button>"; })
+        .join("") + "</div>");
+
+    html(root, '<button class="btn p full" data-a="job" style="margin-bottom:14px">+ New job</button>');
+
+    var list = db.jobs.slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+    if (filt !== "all") list = list.filter(function (j) { return j.status === filt; });
+
+    if (!list.length) html(root, '<div class="card">' + empty("\u{1F9F9}", "No jobs here yet", "") + "</div>");
+    else list.slice(0, 200).forEach(function (j) { html(root, jobCard(j)); });
+
+    on("[data-f]", function (e) { state.f = e.dataset.f; render(); }, root);
+    on("[data-a]", function () { editJob(); }, root);
+    wireJobCards(root);
+  }
+
+  function jobSheet(id) {
+    var j = db.jobs.filter(function (x) { return x.id === id; })[0];
+    if (!j) return;
+    var c = custOf(j.customerId);
+    var mins = (+j.estMin || 0) + (+j.travelMin || 0);
+    var rate = mins > 0 ? (+j.price || 0) / (mins / 60) : 0;
+
+    var h = '<div class="spread"><h3>' + esc(c ? c.name : "(unknown)") + "</h3>" +
+            '<span class="tag ' + (STATUS_TAG[j.status] || "") + '">' + esc(STATUS_LABEL[j.status] || j.status) + "</span></div>" +
+            '<div class="sub">' + esc(niceDate(j.date)) + (j.suburb ? " &middot; " + esc(j.suburb) : "") + "</div>";
+
+    if (c && c.phone) {
+      h += '<div class="wrap mt">' +
+           '<a class="btn sm" href="tel:' + esc(tel(c.phone)) + '">Call ' + esc(c.phone) + "</a>" +
+           '<a class="btn sm" href="sms:' + esc(tel(c.phone)) + '">Text</a>' +
+           (j.suburb ? '<a class="btn sm" target="_blank" rel="noopener" href="https://maps.google.com/?q=' +
+             encodeURIComponent(j.suburb + " QLD") + '">Map</a>' : "") + "</div>";
+    }
+
+    h += '<hr class="sep">';
+    if (j.services) h += '<div class="sub" style="margin-bottom:10px">' + esc(j.services) + "</div>";
+    h += '<div class="q-line"><span>Price</span><b class="money">' + money2(j.price) + "</b></div>" +
+         '<div class="q-line"><span>On site</span><b>' + (+j.estMin || 0) + " min</b></div>" +
+         '<div class="q-line"><span>Travel</span><b>' + (+j.travelMin || 0) + " min</b></div>" +
+         (j.actualMin ? '<div class="q-line"><span>Actually took</span><b>' + j.actualMin + " min</b></div>" : "") +
+         '<div class="q-line"><span>Works out at</span><b class="money">' + money(rate) + "/h</b></div>";
+
+    h += '<div class="mt"><span class="tiny">Move it to</span><div class="wrap" style="margin-top:7px">' +
+      JOB_STATUS.filter(function (s) { return s[0] !== j.status; })
+        .map(function (s) { return '<button class="chip" data-s="' + s[0] + '">' + s[1] + "</button>"; }).join("") +
+      "</div></div>";
+
+    openSheet("Job", h, [
+      { label: "Edit", on: function () { closeSheet(); editJob(j); } },
+      { label: "Delete", cls: "d", on: function () {
+          if (!confirm("Delete this job?\n\nIt goes from the phone and the PC both.")) return;
+          if (commit(function (f) { f.jobs = f.jobs.filter(function (x) { return x.id !== id; }); })) {
+            closeSheet(); toast("Job deleted"); render();
+          }
+        } }
+    ]);
+
+    on("[data-s]", function (e) {
+      var s = e.dataset.s;
+      if (commit(function (f) {
+        f.jobs.forEach(function (x) {
+          if (x.id !== id) return;
+          x.status = s;
+          if (s === "done" && !x.doneDate) x.doneDate = todayISO();
+        });
+      })) { closeSheet(); toast("Marked " + STATUS_LABEL[s].toLowerCase()); render(); }
+    }, $("#sheetBody"));
+  }
+
+  function editJob(j) {
+    var isNew = !j;
+    j = j || { id: "", customerId: "", date: todayISO(), suburb: "", services: "",
+               price: "", estMin: "", travelMin: db.settings.travelDefault || 30,
+               km: "", status: "scheduled", actualMin: "" };
+
+    var custOpts = [["", "-- new customer --"]].concat(
+      db.customers.slice().sort(function (a, b) { return a.name.localeCompare(b.name); })
+        .map(function (c) { return [c.id, c.name]; }));
+
+    var h = field("Customer", "jf_cust", "select", custOpts, j.customerId) +
+      '<div id="jf_newWrap">' + field("New customer name", "jf_name", "text", null, isNew ? "" : "") + "</div>" +
+      field("Date", "jf_date", "date", null, j.date) +
+      field("Suburb", "jf_sub", "text", null, j.suburb) +
+      field("What you are doing", "jf_serv", "text", null, j.services, ' placeholder="Windows in &amp; out, screens"') +
+      '<div class="grid2">' +
+        field("Price $", "jf_price", "number", null, j.price, ' inputmode="decimal" step="1"') +
+        field("On site (min)", "jf_est", "number", null, j.estMin, ' inputmode="numeric"') +
+      "</div>" +
+      '<div class="grid2">' +
+        field("Travel (min)", "jf_trav", "number", null, j.travelMin, ' inputmode="numeric"') +
+        field("Km round trip", "jf_km", "number", null, j.km, ' inputmode="decimal"') +
+      "</div>" +
+      field("Status", "jf_status", "select", JOB_STATUS, j.status) +
+      (isNew ? "" : field("Actually took (min)", "jf_act", "number", null, j.actualMin, ' inputmode="numeric"'));
+
+    openSheet(isNew ? "New job" : "Edit job", h, [
+      { label: "Cancel", on: closeSheet },
+      { label: "Save", cls: "p", on: function () {
+          var cid = val("jf_cust");
+          var newName = val("jf_name");
+          if (!cid && !newName) { toast("Who is it for?"); document.getElementById("jf_name").focus(); return; }
+
+          var ok = commit(function (f) {
+            if (!cid) {
+              var c = { id: uid(), name: newName, phone: "", email: "", suburb: val("jf_sub"),
+                        source: "", freqMonths: 0, notes: "" };
+              f.customers.push(c); cid = c.id;
+            }
+            var rec = {
+              customerId: cid,
+              date: val("jf_date") || todayISO(),
+              suburb: val("jf_sub"),
+              services: val("jf_serv"),
+              price: num("jf_price"),
+              estMin: int("jf_est"),
+              travelMin: int("jf_trav"),
+              km: num("jf_km"),
+              status: val("jf_status") || "scheduled"
+            };
+            if (!isNew) rec.actualMin = int("jf_act");
+
+            if (isNew) {
+              rec.id = uid();
+              f.jobs.push(rec);
+            } else {
+              f.jobs.forEach(function (x) { if (x.id === j.id) Object.assign(x, rec); });
+            }
+          });
+          if (ok) { closeSheet(); toast(isNew ? "Job booked in" : "Saved"); render(); }
+        } }
+    ]);
+
+    /* The "new customer name" box only makes sense when no customer is picked. */
+    var sel = document.getElementById("jf_cust"), wrap = document.getElementById("jf_newWrap");
+    var sync = function () { wrap.style.display = sel.value ? "none" : "block"; };
+    sel.onchange = function () {
+      sync();
+      var c = custOf(sel.value);
+      if (c && c.suburb && !val("jf_sub")) document.getElementById("jf_sub").value = c.suburb;
+    };
+    sync();
+  }
+
+  /* ---------------------------------------------------------------- LEADS */
+
+  var STAGES = [["new", "New - not called yet"], ["contacted", "Contacted"],
+                ["quoted", "Quoted"], ["won", "Won"], ["lost", "Lost"]];
+  var STAGE_LABEL = { "new": "New", contacted: "Contacted", quoted: "Quoted", won: "Won", lost: "Lost" };
+  var STAGE_TAG = { "new": "info", contacted: "", quoted: "warn", won: "good", lost: "bad" };
+
+  function leadCard(l) {
+    var d = daysAgo(l.lastContact || l.received);
+    return '<div class="item" data-lead="' + esc(l.id) + '">' +
+      '<div class="rowx"><div style="min-width:0">' +
+        '<div class="t">' + esc(l.name) + "</div>" +
+        '<div class="m">' + (l.suburb ? esc(l.suburb) + " &middot; " : "") + esc(l.source || "no source") +
+          (d != null ? " &middot; " + (d === 0 ? "today" : d + "d ago") : "") + "</div>" +
+      "</div>" +
+      '<div class="r">' + (l.value ? '<div style="font-weight:700" class="money">' + money(l.value) + "</div>" : "") +
+        '<div class="tag ' + (STAGE_TAG[l.stage] || "") + '" style="margin-top:5px">' + esc(STAGE_LABEL[l.stage] || l.stage) + "</div>" +
+      "</div></div></div>";
+  }
+
+  function wireLeadCards(root) {
+    on("[data-lead]", function (e) { leadSheet(e.dataset.lead); }, root);
+  }
+
+  function vLeads(root) {
+    var filt = state.f || "open";
+    html(root, '<div class="seg" style="margin-bottom:12px">' +
+      [["open", "Open"], ["new", "New"], ["quoted", "Quoted"], ["won", "Won"], ["lost", "Lost"], ["all", "All"]]
+        .map(function (o) { return '<button data-f="' + o[0] + '" class="' + (filt === o[0] ? "on" : "") + '">' + o[1] + "</button>"; })
+        .join("") + "</div>");
+
+    html(root, '<button class="btn p full" data-a="lead" style="margin-bottom:14px">+ New lead</button>');
+
+    var list = db.leads.slice().sort(function (a, b) {
+      return (b.lastContact || b.received || "").localeCompare(a.lastContact || a.received || "");
+    });
+    if (filt === "open") list = list.filter(function (l) { return l.stage !== "won" && l.stage !== "lost"; });
+    else if (filt !== "all") list = list.filter(function (l) { return l.stage === filt; });
+
+    if (!list.length) html(root, '<div class="card">' + empty("\u{1F4E5}", "No leads here",
+      "Anything that comes in off the website lands in Window OS on the PC and turns up here.") + "</div>");
+    else list.forEach(function (l) { html(root, leadCard(l)); });
+
+    on("[data-f]", function (e) { state.f = e.dataset.f; render(); }, root);
+    on("[data-a]", function () { editLead(); }, root);
+    wireLeadCards(root);
+  }
+
+  function leadSheet(id) {
+    var l = db.leads.filter(function (x) { return x.id === id; })[0];
+    if (!l) return;
+
+    var h = '<div class="spread"><h3>' + esc(l.name) + "</h3>" +
+            '<span class="tag ' + (STAGE_TAG[l.stage] || "") + '">' + esc(STAGE_LABEL[l.stage] || l.stage) + "</span></div>" +
+            '<div class="sub">' + (l.suburb ? esc(l.suburb) + " &middot; " : "") + esc(l.source || "") + "</div>";
+
+    if (l.phone) {
+      h += '<div class="wrap mt">' +
+        '<a class="btn sm" href="tel:' + esc(tel(l.phone)) + '">Call ' + esc(l.phone) + "</a>" +
+        '<a class="btn sm" href="sms:' + esc(tel(l.phone)) + '">Text</a>' +
+        (l.email ? '<a class="btn sm" href="mailto:' + esc(l.email) + '">Email</a>' : "") + "</div>";
+    }
+    h += '<hr class="sep">';
+    if (l.value) h += '<div class="q-line"><span>Worth about</span><b class="money">' + money(l.value) + "</b></div>";
+    h += '<div class="q-line"><span>Came in</span><b>' + esc(niceDate(l.received)) + "</b></div>";
+    if (l.lastContact) h += '<div class="q-line"><span>Last spoke</span><b>' + esc(niceDate(l.lastContact)) + "</b></div>";
+    if (l.notes) h += '<div class="sub mt">' + esc(l.notes) + "</div>";
+
+    h += '<div class="mt"><span class="tiny">Move it to</span><div class="wrap" style="margin-top:7px">' +
+      STAGES.filter(function (s) { return s[0] !== l.stage; })
+        .map(function (s) { return '<button class="chip" data-s="' + s[0] + '">' + STAGE_LABEL[s[0]] + "</button>"; }).join("") +
+      '<button class="chip" data-touch>Spoke to them today</button></div></div>';
+
+    openSheet("Lead", h, [
+      { label: "Edit", on: function () { closeSheet(); editLead(l); } },
+      { label: "Delete", cls: "d", on: function () {
+          if (!confirm("Delete this lead?")) return;
+          if (commit(function (f) { f.leads = f.leads.filter(function (x) { return x.id !== id; }); })) {
+            closeSheet(); toast("Lead deleted"); render();
+          }
+        } }
+    ]);
+
+    on("[data-s]", function (e) {
+      var s = e.dataset.s;
+      var doIt = function (makeCustomer) {
+        if (commit(function (f) {
+          f.leads.forEach(function (x) {
+            if (x.id !== id) return;
+            x.stage = s; x.lastContact = todayISO();
+          });
+          if (makeCustomer) {
+            var already = f.customers.some(function (c) {
+              return c.name.toLowerCase() === String(l.name).toLowerCase();
+            });
+            if (!already) {
+              f.customers.push({ id: uid(), name: l.name, phone: l.phone || "", email: l.email || "",
+                                 suburb: l.suburb || "", source: l.source || "", freqMonths: 0, notes: l.notes || "" });
+            }
+          }
+        })) { closeSheet(); toast("Moved to " + STAGE_LABEL[s].toLowerCase()); render(); }
+      };
+      if (s === "won") doIt(confirm("Won it. Add " + l.name + " to your customers as well?"));
+      else doIt(false);
+    }, $("#sheetBody"));
+
+    on("[data-touch]", function () {
+      if (commit(function (f) {
+        f.leads.forEach(function (x) {
+          if (x.id !== id) return;
+          x.lastContact = todayISO();
+          if (x.stage === "new") x.stage = "contacted";
+        });
+      })) { closeSheet(); toast("Noted"); render(); }
+    }, $("#sheetBody"));
+  }
+
+  function editLead(l) {
+    var isNew = !l;
+    l = l || { name: "", phone: "", email: "", suburb: "", value: "", source: "Phone", stage: "new", notes: "" };
+
+    var h = field("Name", "lf_name", "text", null, l.name) +
+      '<div class="grid2">' +
+        field("Phone", "lf_phone", "tel", null, l.phone) +
+        field("Suburb", "lf_sub", "text", null, l.suburb) +
+      "</div>" +
+      field("Email", "lf_email", "email", null, l.email) +
+      '<div class="grid2">' +
+        field("Worth about $", "lf_val", "number", null, l.value, ' inputmode="decimal"') +
+        field("Came from", "lf_src", "select",
+          [["Phone", "Phone"], ["Website", "Website"], ["Facebook", "Facebook"], ["Google", "Google"],
+           ["Referral", "Referral"], ["Door knock", "Door knock"], ["Repeat", "Repeat"], ["Other", "Other"]], l.source) +
+      "</div>" +
+      field("Stage", "lf_stage", "select", STAGES, l.stage) +
+      field("Notes", "lf_notes", "textarea", null, l.notes);
+
+    openSheet(isNew ? "New lead" : "Edit lead", h, [
+      { label: "Cancel", on: closeSheet },
+      { label: "Save", cls: "p", on: function () {
+          var name = val("lf_name");
+          if (!name) { toast("Needs a name"); document.getElementById("lf_name").focus(); return; }
+          var stage = val("lf_stage");
+          var ok = commit(function (f) {
+            var rec = {
+              name: name, phone: val("lf_phone"), email: val("lf_email"), suburb: val("lf_sub"),
+              value: num("lf_val"), source: val("lf_src"), stage: stage, notes: val("lf_notes")
+            };
+            if (isNew) {
+              rec.id = uid();
+              rec.received = todayISO();
+              rec.lastContact = stage === "new" ? "" : todayISO();
+              f.leads.push(rec);
+            } else {
+              f.leads.forEach(function (x) { if (x.id === l.id) Object.assign(x, rec); });
+            }
+          });
+          if (ok) { closeSheet(); toast(isNew ? "Lead saved" : "Saved"); render(); }
+        } }
+    ]);
+    if (isNew) setTimeout(function () { document.getElementById("lf_name").focus(); }, 60);
+  }
+
+  /* ------------------------------------------------------------ CUSTOMERS */
+
+  function vCustomers(root) {
+    html(root,
+      '<input class="in" id="cSearch" type="search" placeholder="Search name or suburb" ' +
+      'value="' + esc(state.q || "") + '" style="margin-bottom:12px">' +
+      '<button class="btn p full" data-a="cust" style="margin-bottom:14px">+ New customer</button>');
+
+    var q = (state.q || "").toLowerCase();
+    var list = db.customers.slice().sort(function (a, b) { return a.name.localeCompare(b.name); });
+    if (q) list = list.filter(function (c) {
+      return (c.name + " " + (c.suburb || "") + " " + (c.phone || "")).toLowerCase().indexOf(q) !== -1;
+    });
+
+    if (!list.length) {
+      html(root, '<div class="card">' + empty("\u{1F464}", q ? "Nobody matches that" : "No customers yet", "") + "</div>");
+    } else {
+      list.forEach(function (c) {
+        var jobs = db.jobs.filter(function (j) { return j.customerId === c.id && j.status !== "cancelled"; });
+        var spent = jobs.reduce(function (s, j) { return s + (+j.price || 0); }, 0);
+        var last = jobs.map(function (j) { return j.date; }).sort().pop();
+        var due = null;
+        if (c.freqMonths && last) due = addDays(last, Math.round(c.freqMonths * 30.4));
+        var overdue = due && due <= todayISO();
+        html(root, '<div class="item" data-cust="' + esc(c.id) + '">' +
+          '<div class="rowx"><div style="min-width:0">' +
+            '<div class="t">' + esc(c.name) + "</div>" +
+            '<div class="m">' + (c.suburb ? esc(c.suburb) + " &middot; " : "") + jobs.length + " job" + (jobs.length === 1 ? "" : "s") +
+              (last ? " &middot; last " + esc(niceDate(last)) : "") + "</div>" +
+          "</div><div class=\"r\"><div style=\"font-weight:700\" class=\"money\">" + money(spent) + "</div>" +
+          (due ? '<div class="tag ' + (overdue ? "warn" : "") + '" style="margin-top:5px">' +
+                 (overdue ? "due now" : "due " + esc(niceDate(due))) + "</div>" : "") +
+          "</div></div></div>");
+      });
+    }
+
+    var s = document.getElementById("cSearch");
+    s.oninput = function () {
+      state.q = s.value;
+      var pos = s.selectionStart;
+      render();
+      var ns = document.getElementById("cSearch");
+      ns.focus(); try { ns.setSelectionRange(pos, pos); } catch (e) {}
+    };
+    on("[data-a]", function () { editCustomer(); }, root);
+    on("[data-cust]", function (e) { custSheet(e.dataset.cust); }, root);
+  }
+
+  function custSheet(id) {
+    var c = custOf(id);
+    if (!c) return;
+    var jobs = db.jobs.filter(function (j) { return j.customerId === id; })
+                      .sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+    var spent = jobs.filter(function (j) { return j.status !== "cancelled"; })
+                    .reduce(function (s, j) { return s + (+j.price || 0); }, 0);
+
+    var h = "<h3>" + esc(c.name) + "</h3>" +
+            '<div class="sub">' + esc(c.suburb || "") + (c.source ? " &middot; " + esc(c.source) : "") + "</div>";
+    if (c.phone) {
+      h += '<div class="wrap mt">' +
+        '<a class="btn sm" href="tel:' + esc(tel(c.phone)) + '">Call ' + esc(c.phone) + "</a>" +
+        '<a class="btn sm" href="sms:' + esc(tel(c.phone)) + '">Text</a>' +
+        (c.email ? '<a class="btn sm" href="mailto:' + esc(c.email) + '">Email</a>' : "") +
+        (c.suburb ? '<a class="btn sm" target="_blank" rel="noopener" href="https://maps.google.com/?q=' +
+          encodeURIComponent(c.suburb + " QLD") + '">Map</a>' : "") + "</div>";
+    }
+    h += '<hr class="sep">' +
+      '<div class="q-line"><span>Spent with you</span><b class="money">' + money2(spent) + "</b></div>" +
+      '<div class="q-line"><span>Jobs</span><b>' + jobs.length + "</b></div>" +
+      (c.freqMonths ? '<div class="q-line"><span>Wants it every</span><b>' + c.freqMonths + " months</b></div>" : "");
+    if (c.notes) h += '<div class="sub mt">' + esc(c.notes) + "</div>";
+
+    if (jobs.length) {
+      h += '<h4 style="margin:16px 0 8px">History</h4>';
+      jobs.slice(0, 12).forEach(function (j) {
+        h += '<div class="q-line"><span>' + esc(niceDate(j.date)) + " &middot; " +
+             esc(STATUS_LABEL[j.status] || j.status) + '</span><b class="money">' + money(j.price) + "</b></div>";
+      });
+    }
+
+    openSheet("Customer", h, [
+      { label: "Book a job", cls: "p", on: function () {
+          closeSheet();
+          editJob({ id: "", customerId: c.id, date: todayISO(), suburb: c.suburb || "", services: "",
+                    price: "", estMin: "", travelMin: db.settings.travelDefault || 30, km: "",
+                    status: "scheduled", actualMin: "" });
+          /* editJob treats a record with no id as new, which is what we want. */
+        } },
+      { label: "Edit", on: function () { closeSheet(); editCustomer(c); } }
+    ]);
+  }
+
+  function editCustomer(c) {
+    var isNew = !c;
+    c = c || { name: "", phone: "", email: "", suburb: "", source: "", freqMonths: 0, notes: "" };
+    var h = field("Name", "cf_name", "text", null, c.name) +
+      '<div class="grid2">' +
+        field("Phone", "cf_phone", "tel", null, c.phone) +
+        field("Suburb", "cf_sub", "text", null, c.suburb) +
+      "</div>" +
+      field("Email", "cf_email", "email", null, c.email) +
+      '<div class="grid2">' +
+        field("Came from", "cf_src", "text", null, c.source) +
+        field("Every (months)", "cf_freq", "number", null, c.freqMonths, ' inputmode="numeric"') +
+      "</div>" +
+      field("Notes", "cf_notes", "textarea", null, c.notes,
+        ' placeholder="Gate code, dog, where the tap is..."');
+
+    openSheet(isNew ? "New customer" : "Edit customer", h, [
+      { label: "Cancel", on: closeSheet },
+      { label: "Save", cls: "p", on: function () {
+          var name = val("cf_name");
+          if (!name) { toast("Needs a name"); document.getElementById("cf_name").focus(); return; }
+          var ok = commit(function (f) {
+            var rec = { name: name, phone: val("cf_phone"), email: val("cf_email"),
+                        suburb: val("cf_sub"), source: val("cf_src"),
+                        freqMonths: int("cf_freq"), notes: val("cf_notes") };
+            if (isNew) { rec.id = uid(); f.customers.push(rec); }
+            else f.customers.forEach(function (x) { if (x.id === c.id) Object.assign(x, rec); });
+          });
+          if (ok) { closeSheet(); toast("Saved"); render(); }
+        } }
+    ]);
+  }
+
+  /* ---------------------------------------------------------------- QUOTE */
+
+  var COUNT_IDS = ["gStd", "gLrg", "uWin", "fly", "sec", "trk", "door"];
+
+  function vQuote(root) {
+    var q = state.q2 = state.q2 || {
+      storeys: "single", groundSides: "out", upSides: "out",
+      condition: "normal", travel: "local", freq: "once",
+      n: { gStd: 0, gLrg: 0, uWin: 0, fly: 0, sec: 0, trk: 0, door: 0 }
+    };
+
+    function seg(key, opts) {
+      return '<div class="seg" data-seg="' + key + '" style="margin-bottom:12px">' +
+        opts.map(function (o) {
+          return '<button data-v="' + o[0] + '" class="' + (q[key] === o[0] ? "on" : "") + '">' + o[1] + "</button>";
+        }).join("") + "</div>";
+    }
+    function step(key, label, note) {
+      return '<div class="card" style="padding:12px;margin-bottom:9px">' +
+        '<div class="rowx"><div style="flex:1;min-width:0"><div style="font-weight:700">' + label + "</div>" +
+        (note ? '<div class="tiny">' + note + "</div>" : "") + "</div>" +
+        '<div class="stepper" style="width:150px;flex:none" data-step="' + key + '">' +
+          '<button data-d="-1">−</button>' +
+          '<input type="number" inputmode="numeric" value="' + (q.n[key] || 0) + '">' +
+          '<button data-d="1">+</button>' +
+        "</div></div></div>";
+    }
+
+    html(root,
+      "<h3>The house</h3>" +
+      seg("storeys", [["single", "Single storey"], ["double", "Two storey"]]) +
+      "<h3>Ground floor windows</h3>" +
+      seg("groundSides", [["out", "Outside only"], ["both", "Inside + out"]]) +
+      step("gStd", "Standard windows", "the usual size") +
+      step("gLrg", "Large windows", "sliders, big panes, stacker doors") +
+      (q.storeys === "double"
+        ? "<h3 class=\"mt\">Upstairs</h3>" + seg("upSides", [["out", "Outside only"], ["both", "Inside + out"]]) +
+          step("uWin", "Upstairs windows", "pole work")
+        : "") +
+      '<h3 class="mt">Extras</h3>' +
+      step("fly", "Flyscreens", "") +
+      step("sec", "Security screens", "") +
+      step("trk", "Tracks", "") +
+      step("door", "Sliding doors", "") +
+      '<h3 class="mt">How bad is it</h3>' +
+      seg("condition", [["normal", "Normal"], ["hard", "Hard (+" + qset.hardPct + "%)"], ["heavy", "Neglected (+" + qset.heavyPct + "%)"]]) +
+      "<h3>Travel</h3>" +
+      seg("travel", [["local", "Local"], ["far", "45 min+ each way"]]) +
+      "<h3>How often</h3>" +
+      seg("freq", [["once", "One-off"], ["q", "Every 3 months"], ["h", "Every 6 months"]]) +
+      '<div id="qOut"></div>');
+
+    on("[data-seg] button", function (e) {
+      q[e.parentNode.dataset.seg] = e.dataset.v;
+      render();
+    }, root);
+
+    root.querySelectorAll("[data-step]").forEach(function (st) {
+      var key = st.dataset.step, inp = st.querySelector("input");
+      st.querySelectorAll("button").forEach(function (b) {
+        b.onclick = function () {
+          var v = Math.max(0, (parseInt(inp.value, 10) || 0) + parseInt(b.dataset.d, 10));
+          inp.value = v; q.n[key] = v; drawQuote();
+        };
+      });
+      inp.oninput = function () { q.n[key] = Math.max(0, parseInt(inp.value, 10) || 0); drawQuote();  };
+    });
+
+    drawQuote();
+  }
+
+  /* The pricing below is the desktop quote calculator's, line for line. If the
+     rate card changes there, change it here too - or the phone will quote a
+     different number from the one on the wall. */
+  function calcQuote() {
+    var q = state.q2;
+    var isDouble = q.storeys === "double";
+    var gBoth = q.groundSides === "both", uBoth = q.upSides === "both";
+    var n = Object.assign({}, q.n);
+    if (!isDouble) n.uWin = 0;
+
+    var rate = {
+      gStd: gBoth ? qset.stdBoth : qset.stdOut,
+      gLrg: gBoth ? qset.lrgBoth : qset.lrgOut,
+      uWin: uBoth ? qset.upBoth : qset.upOut,
+      fly: qset.flyscreen, sec: qset.securityScreen,
+      trk: qset.track, door: qset.slidingDoor
+    };
+
+    var lines = [], work = 0;
+    function add(key, label) {
+      if (n[key] <= 0) return;
+      var cost = n[key] * rate[key];
+      lines.push([n[key] + " " + label + " × " + money2(rate[key]), cost]);
+      work += cost;
+    }
+    add("gStd", gBoth ? "standard, in + out" : "standard, outside");
+    add("gLrg", gBoth ? "large, in + out" : "large, outside");
+    add("uWin", uBoth ? "upstairs, in + out" : "upstairs, outside");
+    add("fly", n.fly === 1 ? "flyscreen" : "flyscreens");
+    add("sec", n.sec === 1 ? "security screen" : "security screens");
+    add("trk", n.trk === 1 ? "track" : "tracks");
+    add("door", n.door === 1 ? "sliding door" : "sliding doors");
+
+    var pct = q.condition === "hard" ? qset.hardPct : q.condition === "heavy" ? qset.heavyPct : 0;
+    if (pct > 0 && work > 0) {
+      var sur = work * (pct / 100);
+      lines.push([(q.condition === "heavy" ? "Neglected property" : "Hard work") + " (+" + pct + "%)", sur]);
+      work += sur;
+    }
+
+    var travelFee = q.travel === "far" ? qset.travelFee : 0;
+    if (travelFee > 0) lines.push(["Travel - 45 min or more each way", travelFee]);
+
+    var base = isDouble ? qset.minDouble : qset.minSingle;
+    var first = work + travelFee, floored = false;
+    if (first < base) { first = base; floored = true; }
+
+    var discPct = q.freq === "q" ? qset.discQ : q.freq === "h" ? qset.discH : 0;
+    var repeat = first * (1 - discPct / 100);
+    if (repeat < base) repeat = base;
+
+    var onSite = TIME.setup;
+    onSite += n.gStd * (gBoth ? TIME.stdBoth : TIME.stdOut);
+    onSite += n.gLrg * (gBoth ? TIME.lrgBoth : TIME.lrgOut);
+    onSite += n.uWin * (uBoth ? TIME.upBoth : TIME.upOut);
+    onSite += n.fly * TIME.flyscreen;
+    onSite += n.sec * TIME.securityScreen;
+    onSite += n.trk * TIME.track;
+    onSite += n.door * TIME.slidingDoor;
+    if (q.condition === "hard") onSite *= TIME.hardMult;
+    if (q.condition === "heavy") onSite *= TIME.heavyMult;
+
+    var travelMins = (q.travel === "far" ? TIME.travelFar : TIME.travelLocal) * 2;
+    var totalMins = onSite + travelMins;
+    var hourly = totalMins > 0 ? first / (totalMins / 60) : 0;
+
+    return { lines: lines, first: first, repeat: repeat, discPct: discPct, floored: floored,
+             base: base, onSite: Math.round(onSite), hourly: hourly, anything: work > 0,
+             windows: n.gStd + n.gLrg + n.uWin };
+  }
+
+  function drawQuote() {
+    var out = document.getElementById("qOut");
+    if (!out) return;
+    var r = calcQuote();
+
+    if (!r.anything) {
+      out.innerHTML = '<div class="card mt">' + empty("\u{1F4B2}", "Count the windows",
+        "Tap the plus buttons above and the price works itself out.") + "</div>";
+      return;
+    }
+
+    var target = qset.targetRate || 90;
+    var rateTag = r.hourly >= target ? "good" : r.hourly >= target * 0.8 ? "warn" : "bad";
+
+    var h = '<div class="card mt">' +
+      r.lines.map(function (l) {
+        return '<div class="q-line"><span>' + esc(l[0]) + '</span><b class="money">' + money2(l[1]) + "</b></div>";
+      }).join("") +
+      (r.floored ? '<div class="tiny mt">Under your ' + money(r.base) + " minimum, so it is the minimum.</div>" : "") +
+      '<div class="q-total money">' + money(r.first) + "</div>" +
+      '<div class="sub">First clean' + (r.discPct ? ", then " + money(r.repeat) + " each time after" : "") + "</div>" +
+      '<div class="wrap mt">' +
+        '<span class="tag">' + Math.round(r.onSite) + " min on site</span>" +
+        '<span class="tag ' + rateTag + '">' + money(r.hourly) + "/h</span>" +
+        '<span class="tag">' + r.windows + " windows</span>" +
+      "</div>" +
+      '<div class="grid2 mt">' +
+        '<button class="btn" data-qc>Copy the words</button>' +
+        '<button class="btn p" data-ql>Save as a lead</button>' +
+      "</div></div>";
+    out.innerHTML = h;
+
+    on("[data-qc]", function () { copy(quoteWords(r)); }, out);
+    on("[data-ql]", function () { quoteToLead(r); }, out);
+  }
+
+  function quoteWords(r) {
+    var q = state.q2;
+    var L = [];
+    L.push("Thanks for getting in touch.");
+    L.push("");
+    L.push("For " + (q.storeys === "double" ? "a two storey place" : "a single storey place") +
+           " with " + r.windows + " windows " +
+           (q.groundSides === "both" ? "done inside and out" : "done on the outside") +
+           (q.condition === "normal" ? "" : q.condition === "hard" ? ", and a bit of extra work in them" :
+            ", and a fair bit of build-up to get through") + ":");
+    L.push("");
+    L.push(money(r.first) + " for the first clean.");
+    if (r.discPct) {
+      L.push("If you go " + (q.freq === "q" ? "every three months" : "every six months") +
+             " after that it drops to " + money(r.repeat) + " a clean.");
+    }
+    L.push("");
+    L.push("That is all up front - no call out fee on top. Should take about " +
+           (r.onSite >= 90 ? Math.round(r.onSite / 60 * 10) / 10 + " hours" : Math.round(r.onSite) + " minutes") + " on site.");
+    L.push("");
+    L.push("Happy to lock in a day that suits if you want to go ahead.");
+    L.push("");
+    L.push("Liam");
+    L.push("Far North Window Cleaning");
+    L.push("0478 521 431");
+    return L.join("\n");
+  }
+
+  function quoteToLead(r) {
+    var h = field("Name", "qlf_name", "text", null, "") +
+      '<div class="grid2">' +
+        field("Phone", "qlf_phone", "tel", null, "") +
+        field("Suburb", "qlf_sub", "text", null, "") +
+      "</div>" +
+      '<div class="sub">It saves at ' + money(r.first) + ", quoted today.</div>";
+    openSheet("Save as a lead", h, [
+      { label: "Cancel", on: closeSheet },
+      { label: "Save", cls: "p", on: function () {
+          var name = val("qlf_name");
+          if (!name) { toast("Needs a name"); return; }
+          var q = state.q2;
+          var notes = [
+            q.storeys === "double" ? "two storey" : "single storey",
+            r.windows + " windows",
+            q.groundSides === "both" ? "in and out" : "outside only",
+            q.condition !== "normal" ? q.condition : "",
+            "about " + Math.round(r.onSite) + " min on site"
+          ].filter(Boolean).join(", ");
+
+          var ok = commit(function (f) {
+            f.leads.push({
+              id: uid(), name: name, phone: val("qlf_phone"), email: "", suburb: val("qlf_sub"),
+              value: Math.round(r.first), source: "Phone", stage: "quoted",
+              received: todayISO(), lastContact: todayISO(),
+              notes: "Quoted off the phone. " + notes + "."
+            });
+          });
+          if (ok) { closeSheet(); toast("Saved as a quoted lead"); go("leads"); }
+        } }
+    ]);
+  }
+
+  /* ---------------------------------------------------------------- REPLY */
+
+  var TOPIC = [
+    ["price",      /how much|what.{0,14}cost|price|quote|ballpark|estimate|charge|rates/i],
+    ["when",       /when (can|could|would|are|will|do|might)|what days|availab|are you free|any free|fit (me|us) in|book (me|us) in|soonest|earliest|this week|next week|come (out|round|over)|get (me|us) in/i],
+    ["rebook",     /again|another clean|next clean|due|regular|quarterly|every (three|3|six|6) month|same as last/i],
+    ["confirm",    /confirm|still (ok|on|coming)|are we (booked|set)|see you (on|then)|what time (are|will)/i],
+    ["invoice",    /invoice|receipt|pay|payment|bank details|owe|paid|bill|eftpos/i],
+    ["reschedule", /reschedul|move it|move the|change the (time|day|date)|postpone|can.?t make|cancel/i],
+    ["problem",    /not happy|unhappy|complain|streak|missed|disappoint|poor job|refund|still dirty|marks left|smear/i]
+  ];
+  var SIGNAL = [
+    ["urgent",     /asap|urgent|as soon as|straight away|this week|by (friday|monday|tomorrow)|short notice|quickly/i],
+    ["inspection", /inspection|open home|open house|photos|photographer|valuation|appraisal/i],
+    ["selling",    /selling|on the market|sale|list(ing|ed) the (house|place)/i],
+    ["moving",     /moving out|vacate|vacating|bond|end of lease|final clean|moving in/i],
+    ["renovation", /renovat|builder|new build|reno|construction|paint splatter|render|plaster|dust everywhere/i],
+    ["salt",       /salt|sea (air|spray)|beach ?front|ocean/i],
+    ["mould",      /mould|mold|mildew|black spot/i],
+    ["hardwater",  /hard water|sprinkler|water mark|calcium|mineral/i],
+    ["dog",        /dog|puppy|pooch|staffy|kelpie/i],
+    ["gate",       /gate|side access|code is|keypad|padlock|locked/i],
+    ["notHome",    /not (be )?home|at work|won.?t be (there|here)|leave the key|key under/i],
+    ["high",       /high|hard to reach|ladder|two storey|2 storey|upstairs|second storey|tall/i],
+    ["commercial", /shop|office|cafe|restaurant|business premises|body corporate|strata|real estate|property manager|airbnb|holiday (let|rental)/i],
+    ["budget",     /tight budget|cheap|best price|competitive|shopping around|other quotes/i]
+  ];
+  var TOPIC_LABEL = {
+    price: "Asking a price", when: "When can you come", rebook: "Wants another clean",
+    confirm: "Confirming a booking", invoice: "About an invoice", reschedule: "Wants to move it",
+    problem: "Not happy", general: "Not sure"
+  };
+  var SIGNAL_LABEL = {
+    urgent: "in a hurry", inspection: "inspection coming", selling: "selling the place",
+    moving: "end of lease", renovation: "after a reno", salt: "salt build up",
+    mould: "mould", hardwater: "hard water marks", dog: "has a dog", gate: "gate or access",
+    notHome: "will not be home", high: "high or two storey", commercial: "business or rental",
+    budget: "price sensitive"
+  };
+
+  function readMessage(text) {
+    var topic = "general", signals = [];
+    for (var i = 0; i < TOPIC.length; i++) {
+      if (TOPIC[i][1].test(text)) { topic = TOPIC[i][0]; break; }
+    }
+    SIGNAL.forEach(function (s) { if (s[1].test(text)) signals.push(s[0]); });
+    return { topic: topic, signals: signals };
+  }
+
+  function buildReply(text, tone) {
+    var r = readMessage(text);
+    var brief = tone === "brief", warm = tone === "warm";
+    var has = function (s) { return r.signals.indexOf(s) !== -1; };
+    var L = [];
+
+    L.push(warm ? "Hi, thanks for getting in touch." : brief ? "Hi," : "Hi, thanks for the message.");
+    L.push("");
+
+    if (r.topic === "price") {
+      L.push("Happy to give you a price. A single storey place done on the outside starts at " +
+             money(qset.minSingle) + ", and two storey starts at " + money(qset.minDouble) + ".");
+      L.push("The exact number comes down to how many windows there are and whether you want the " +
+             "insides done as well, so if you can tell me roughly how many and whether it is single " +
+             "or double storey I can give you a firm figure straight back.");
+    } else if (r.topic === "when") {
+      L.push("I have got room coming up and can most likely sort you out." +
+             (has("urgent") ? " I will see what I can do to get to you quickly." : ""));
+      L.push("What days generally suit you? I will line up the closest one I have free.");
+    } else if (r.topic === "rebook") {
+      L.push("Good to hear from you again - happy to get you back in the book.");
+      L.push("What week works for you and I will lock it in.");
+    } else if (r.topic === "confirm") {
+      L.push("Yes, all still on. I will give you a heads up when I am on the way.");
+      L.push("Anything you want me to keep an eye on while I am there, just say.");
+    } else if (r.topic === "invoice") {
+      L.push("No problem. I will send the invoice through with the bank details on it.");
+      L.push("Bank transfer is easiest, and there is no rush.");
+    } else if (r.topic === "reschedule") {
+      L.push("Not a problem at all, things come up.");
+      L.push("What day suits you better? I will move it across.");
+    } else if (r.topic === "problem") {
+      L.push("Sorry to hear that - that is not the standard I work to and I want it sorted.");
+      L.push("I will come back and put it right at no charge. What day suits you?");
+    } else {
+      L.push("Happy to help with that.");
+      L.push("Let me know a bit more about what you are after and I will get straight back to you.");
+    }
+
+    /* Anything we picked up about the property that is worth mentioning. */
+    var notes = [];
+    if (has("inspection") || has("selling")) notes.push("I know there is a deadline on it - I will make sure you are done in time.");
+    if (has("moving")) notes.push("End of lease work is common for me, so I know what the agents look for.");
+    if (has("renovation")) notes.push("Builders dust and render splatter needs a bit of extra work, but it comes off.");
+    if (has("salt")) notes.push("Salt build-up near the water is normal up here and it cleans off fine.");
+    if (has("mould") || has("hardwater")) notes.push("Those marks usually come off - I will let you know when I see them if any are in the glass for good.");
+    if (has("high")) notes.push("Upstairs is no trouble, I am set up for pole work.");
+    if (has("commercial")) notes.push("I do a fair bit of commercial and rental work, so I can work around your hours.");
+    if (has("gate")) notes.push("Just let me know about the access on the day.");
+    if (has("dog")) notes.push("Dogs are fine, I just need to know they are shut away while the gate is open.");
+    if (has("notHome")) notes.push("You do not need to be home for the outsides.");
+    if (has("budget")) notes.push("I am not the cheapest, but you will not be calling someone back to redo it.");
+
+    if (notes.length && !brief) {
+      L.push("");
+      L.push(notes.slice(0, 2).join(" "));
+    }
+
+    L.push("");
+    L.push(warm ? "Cheers," : "Thanks,");
+    L.push("Liam");
+    L.push("Far North Window Cleaning");
+    L.push("0478 521 431");
+
+    return { text: L.join("\n"), read: r };
+  }
+
+  function vReply(root) {
+    var tone = state.tone || "normal";
+    html(root,
+      '<div class="card">' +
+        '<label class="f"><span>Paste what they sent you</span>' +
+        '<textarea class="in" id="rIn" placeholder="Hi, how much would it be to do the windows on a 2 storey place in Trinity Beach? We have an inspection next week.">' +
+        esc(state.rin || "") + "</textarea></label>" +
+        '<div class="seg" style="margin-bottom:10px">' +
+          [["brief", "Short"], ["normal", "Normal"], ["warm", "Friendly"]].map(function (o) {
+            return '<button data-tone="' + o[0] + '" class="' + (tone === o[0] ? "on" : "") + '">' + o[1] + "</button>";
+          }).join("") + "</div>" +
+        '<button class="btn p full" id="rGo">Write me a reply</button>' +
+      "</div><div id=\"rOut\"></div>");
+
+    var ta = document.getElementById("rIn");
+    ta.oninput = function () { state.rin = ta.value; };
+    on("[data-tone]", function (e) { state.tone = e.dataset.tone; render(); }, root);
+    document.getElementById("rGo").onclick = function () {
+      var t = ta.value.trim();
+      if (!t) { toast("Paste their message in first"); ta.focus(); return; }
+      state.rin = t;
+      var r = buildReply(t, tone);
+      var out = document.getElementById("rOut");
+      out.innerHTML = '<div class="card mt">' +
+        '<div class="wrap" style="margin-bottom:10px">' +
+          '<span class="tag info">' + esc(TOPIC_LABEL[r.read.topic]) + "</span>" +
+          r.read.signals.map(function (s) { return '<span class="tag">' + esc(SIGNAL_LABEL[s] || s) + "</span>"; }).join("") +
+        "</div>" +
+        '<textarea class="in" id="rText" style="min-height:260px">' + esc(r.text) + "</textarea>" +
+        '<div class="grid2 mt">' +
+          '<button class="btn p" id="rCopy">Copy it</button>' +
+          '<button class="btn" id="rLead">Save as a lead</button>' +
+        "</div></div>";
+      document.getElementById("rCopy").onclick = function () { copy(document.getElementById("rText").value); };
+      document.getElementById("rLead").onclick = function () { replyToLead(t, r.read); };
+      out.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+  }
+
+  function replyToLead(text, read) {
+    var h = field("Name", "rlf_name", "text", null, "") +
+      '<div class="grid2">' +
+        field("Phone", "rlf_phone", "tel", null, "") +
+        field("Suburb", "rlf_sub", "text", null, "") +
+      "</div>";
+    openSheet("Save as a lead", h, [
+      { label: "Cancel", on: closeSheet },
+      { label: "Save", cls: "p", on: function () {
+          var name = val("rlf_name");
+          if (!name) { toast("Needs a name"); return; }
+          var tags = read.signals.map(function (s) { return SIGNAL_LABEL[s] || s; }).join(", ");
+          var ok = commit(function (f) {
+            f.leads.push({
+              id: uid(), name: name, phone: val("rlf_phone"), email: "", suburb: val("rlf_sub"),
+              value: 0, source: "Phone", stage: "contacted",
+              received: todayISO(), lastContact: todayISO(),
+              notes: TOPIC_LABEL[read.topic] + (tags ? " - " + tags : "") + ". " +
+                     String(text).slice(0, 300)
+            });
+          });
+          if (ok) { closeSheet(); toast("Saved as a lead"); go("leads"); }
+        } }
+    ]);
+  }
+
+  /* ---------------------------------------------------------------- BOOKS */
+
+  function fyOf(iso) {
+    if (!iso) return null;
+    var d = new Date(iso + "T00:00:00");
+    if (isNaN(d)) return null;
+    return d.getMonth() >= 6 ? d.getFullYear() : d.getFullYear() - 1;
+  }
+
+  function vBooks(root) {
+    var fy = state.fy != null ? state.fy : fyOf(todayISO());
+    var years = {};
+    db.expenses.forEach(function (e) { var y = fyOf(e.date); if (y != null) years[y] = 1; });
+    db.jobs.forEach(function (j) { var y = fyOf(j.date); if (y != null) years[y] = 1; });
+    years[fyOf(todayISO())] = 1;
+    var yearList = Object.keys(years).map(Number).sort(function (a, b) { return b - a; });
+
+    var exps = db.expenses.filter(function (e) { return fyOf(e.date) === fy; });
+    var spent = exps.reduce(function (s, e) {
+      var use = e.use == null ? 100 : e.use;
+      return s + (+e.amount || 0) * (use / 100);
+    }, 0);
+    var earned = db.jobs.filter(function (j) {
+      return fyOf(j.date) === fy && (j.status === "paid" || j.status === "invoiced" || j.status === "done");
+    }).reduce(function (s, j) { return s + (+j.price || 0); }, 0);
+
+    html(root, '<div class="seg" style="margin-bottom:12px">' +
+      yearList.map(function (y) {
+        return '<button data-fy="' + y + '" class="' + (y === fy ? "on" : "") + '">FY ' + y + "/" + String(y + 1).slice(2) + "</button>";
+      }).join("") + "</div>");
+
+    html(root, '<div class="grid3" style="margin-bottom:12px">' +
+      '<div class="stat"><b class="money">' + money(earned) + "</b><span>came in</span></div>" +
+      '<div class="stat"><b class="money">' + money(spent) + "</b><span>claimable</span></div>" +
+      '<div class="stat"><b class="money">' + money(earned - spent) + "</b><span>profit</span></div>" +
+      "</div>");
+
+    html(root, '<button class="btn p full" data-a="exp" style="margin-bottom:14px">+ Log an expense</button>');
+
+    /* Where the money went, biggest first - the view that actually changes
+       what you buy next month. */
+    var byCat = {};
+    exps.forEach(function (e) {
+      var use = e.use == null ? 100 : e.use;
+      var c = e.category || "Other";
+      byCat[c] = (byCat[c] || 0) + (+e.amount || 0) * (use / 100);
+    });
+    var cats = Object.keys(byCat).sort(function (a, b) { return byCat[b] - byCat[a]; });
+    if (cats.length) {
+      html(root, '<div class="card"><h3 style="margin-bottom:10px">Where it went</h3>' +
+        cats.map(function (c) {
+          var pct = spent > 0 ? Math.round(byCat[c] / spent * 100) : 0;
+          return '<div class="q-line"><span>' + esc(c) + ' <span class="tiny">' + pct + '%</span></span>' +
+                 '<b class="money">' + money2(byCat[c]) + "</b></div>";
+        }).join("") + "</div>");
+    }
+
+    html(root, '<h3 style="margin:16px 0 8px">Receipts</h3>');
+    var list = exps.slice().sort(function (a, b) { return (b.date || "").localeCompare(a.date || ""); });
+    if (!list.length) {
+      html(root, '<div class="card">' + empty("\u{1F4D2}", "Nothing logged this year",
+        "Snap it the moment you pay for it - that is the whole trick.") + "</div>");
+    } else {
+      list.slice(0, 150).forEach(function (e) {
+        html(root, '<div class="item" data-exp="' + esc(e.id) + '"><div class="rowx"><div style="min-width:0">' +
+          '<div class="t">' + esc(e.desc) + "</div>" +
+          '<div class="m">' + esc(niceDate(e.date)) + " &middot; " + esc(e.category || "Other") +
+            (e.use != null && e.use < 100 ? " &middot; " + e.use + "% business" : "") +
+            (e.photo ? " &middot; \u{1F4F7}" : "") + "</div>" +
+          '</div><div class="r"><b class="money">' + money2(e.amount) + "</b></div></div></div>");
+      });
+    }
+
+    on("[data-fy]", function (e) { state.fy = parseInt(e.dataset.fy, 10); render(); }, root);
+    on("[data-a]", function () { editExpense(); }, root);
+    on("[data-exp]", function (e) { expSheet(e.dataset.exp); }, root);
+  }
+
+  function expSheet(id) {
+    var e = db.expenses.filter(function (x) { return x.id === id; })[0];
+    if (!e) return;
+    var use = e.use == null ? 100 : e.use;
+    var h = "<h3>" + esc(e.desc) + "</h3>" +
+      '<div class="sub">' + esc(niceDate(e.date)) + " &middot; " + esc(e.category || "Other") + "</div>" +
+      '<hr class="sep">' +
+      '<div class="q-line"><span>Paid</span><b class="money">' + money2(e.amount) + "</b></div>" +
+      '<div class="q-line"><span>Business use</span><b>' + use + "%</b></div>" +
+      '<div class="q-line"><span>Claimable</span><b class="money">' + money2((+e.amount || 0) * use / 100) + "</b></div>" +
+      (e.supplier ? '<div class="q-line"><span>From</span><b>' + esc(e.supplier) + "</b></div>" : "") +
+      (e.note ? '<div class="sub mt">' + esc(e.note) + "</div>" : "") +
+      (e.photo ? '<img src="' + esc(e.photo) + '" alt="Receipt" style="width:100%;border-radius:11px;margin-top:12px">' : "");
+
+    openSheet("Expense", h, [
+      { label: "Edit", on: function () { closeSheet(); editExpense(e); } },
+      { label: "Delete", cls: "d", on: function () {
+          if (!confirm("Delete this expense?")) return;
+          if (commit(function (f) { f.expenses = f.expenses.filter(function (x) { return x.id !== id; }); })) {
+            closeSheet(); toast("Deleted"); render();
+          }
+        } }
+    ]);
+  }
+
+  function editExpense(e) {
+    var isNew = !e;
+    e = e || { date: todayISO(), desc: "", category: "Fuel", amount: "", use: 100,
+               note: "", supplier: "", photo: null };
+    var pendingPhoto = e.photo || null;
+
+    var h = field("What was it", "ef_desc", "text", null, e.desc, ' placeholder="Fuel, squeegee rubber, insurance..."') +
+      '<div class="grid2">' +
+        field("Amount $", "ef_amt", "number", null, e.amount, ' inputmode="decimal" step="0.01"') +
+        field("Date", "ef_date", "date", null, e.date) +
+      "</div>" +
+      field("Category", "ef_cat", "select", CATS.map(function (c) { return [c, c]; }), e.category) +
+      '<div class="grid2">' +
+        field("Business use %", "ef_use", "number", null, e.use == null ? 100 : e.use, ' inputmode="numeric"') +
+        field("Bought from", "ef_sup", "text", null, e.supplier) +
+      "</div>" +
+      field("Note", "ef_note", "text", null, e.note) +
+      '<label class="f"><span>Receipt photo</span>' +
+      '<input class="in" id="ef_photo" type="file" accept="image/*" capture="environment"></label>' +
+      '<div class="tiny" id="ef_pnote">' +
+        (pendingPhoto ? "A photo is attached. Pick another to replace it." :
+         "Snap the receipt now - the ATO wants it and paper fades in the ute.") + "</div>" +
+      (pendingPhoto ? '<img id="ef_prev" src="' + esc(pendingPhoto) + '" style="width:100%;border-radius:11px;margin-top:10px">' : "");
+
+    openSheet(isNew ? "New expense" : "Edit expense", h, [
+      { label: "Cancel", on: closeSheet },
+      { label: "Save", cls: "p", on: function () {
+          var desc = val("ef_desc"), amt = num("ef_amt");
+          if (!desc) { toast("What was it for?"); document.getElementById("ef_desc").focus(); return; }
+          if (!(amt > 0)) { toast("How much was it?"); document.getElementById("ef_amt").focus(); return; }
+          var use = int("ef_use");
+          if (!isFinite(use) || use < 0 || use > 100) use = 100;
+
+          var ok = commit(function (f) {
+            var rec = {
+              date: val("ef_date") || todayISO(),
+              desc: desc,
+              category: val("ef_cat") || "Other",
+              amount: Math.round(amt * 100) / 100,
+              use: use,
+              note: val("ef_note"),
+              supplier: val("ef_sup"),
+              photo: pendingPhoto || null
+            };
+            f.expenses = f.expenses || [];
+            if (isNew) {
+              rec.id = uid();
+              rec.added = new Date().toISOString();
+              f.expenses.push(rec);
+            } else {
+              f.expenses.forEach(function (x) { if (x.id === e.id) Object.assign(x, rec); });
+            }
+          });
+          if (ok) { closeSheet(); toast("Logged"); render(); }
+        } }
+    ]);
+
+    /* Receipts get squeezed down hard before they are stored. A raw phone
+       photo is three or four megabytes; localStorage gives you about five in
+       total, and every one of those bytes also has to go up to Firestore. */
+    document.getElementById("ef_photo").onchange = function (ev) {
+      var file = ev.target.files && ev.target.files[0];
+      if (!file) return;
+      var note = document.getElementById("ef_pnote");
+      note.textContent = "Shrinking the photo...";
+      var fr = new FileReader();
+      fr.onload = function () {
+        var img = new Image();
+        img.onload = function () {
+          var max = 1000;
+          var w = img.width, h2 = img.height;
+          if (w > max || h2 > max) {
+            var s = Math.min(max / w, max / h2);
+            w = Math.round(w * s); h2 = Math.round(h2 * s);
+          }
+          var cv = document.createElement("canvas");
+          cv.width = w; cv.height = h2;
+          cv.getContext("2d").drawImage(img, 0, 0, w, h2);
+          pendingPhoto = cv.toDataURL("image/jpeg", 0.62);
+          note.textContent = "Photo attached (" + Math.round(pendingPhoto.length / 1024) + " KB).";
+          var prev = document.getElementById("ef_prev");
+          if (!prev) {
+            prev = document.createElement("img");
+            prev.id = "ef_prev";
+            prev.setAttribute("style", "width:100%;border-radius:11px;margin-top:10px");
+            note.parentNode.appendChild(prev);
+          }
+          prev.src = pendingPhoto;
+        };
+        img.onerror = function () { note.textContent = "That image could not be read."; };
+        img.src = fr.result;
+      };
+      fr.readAsDataURL(file);
+    };
+  }
+
+  /* ------------------------------------------------------------- SETTINGS */
+
+  function vSettings(root) {
+    var on1 = FNWCSync.isOn(), cfgd = FNWCSync.configured();
+    var st = FNWCSync.status();
+
+    html(root, '<div class="card">' +
+      '<h3>Sync</h3>' +
+      '<div class="sub" style="margin-bottom:10px">' +
+        (!cfgd ? "Not set up yet. The Firebase keys still need pasting into <b>fnwc-firebase-config.js</b>. See SETUP-SYNC.md."
+         : on1 ? "On, signed in as <b>" + esc(FNWCSync.account()) + "</b>. Status: " + esc(st.text) + "."
+         : "Set up, but this device has not signed in yet.") +
+      "</div>" +
+      '<div class="wrap">' +
+        '<button class="btn p" id="sSync">' + (on1 ? "Sync now" : "Sign in to sync") + "</button>" +
+        (on1 ? '<button class="btn" id="sPanel">Account</button>' : "") +
+      "</div>" +
+      '<div class="tiny mt">This device is <code>' + esc(FNWCSync.deviceId) + "</code>.</div>" +
+    "</div>");
+
+    html(root, '<div class="card"><h3>What is in here</h3>' +
+      '<div class="q-line"><span>Customers</span><b>' + db.customers.length + "</b></div>" +
+      '<div class="q-line"><span>Jobs</span><b>' + db.jobs.length + "</b></div>" +
+      '<div class="q-line"><span>Leads</span><b>' + db.leads.length + "</b></div>" +
+      '<div class="q-line"><span>Expenses</span><b>' + db.expenses.length + "</b></div>" +
+      '<div class="q-line"><span>Storage used</span><b>' +
+        Math.round((localStorage.getItem(KEY) || "").length / 1024) + " KB</b></div>" +
+    "</div>");
+
+    html(root, '<div class="card"><h3>Rate card</h3>' +
+      '<div class="sub" style="margin-bottom:10px">These come from the quote calculator and sync with it.</div>' +
+      '<div class="grid2">' +
+        field("Single storey min $", "st_minS", "number", null, qset.minSingle, ' inputmode="decimal"') +
+        field("Two storey min $", "st_minD", "number", null, qset.minDouble, ' inputmode="decimal"') +
+      "</div>" +
+      '<div class="grid2">' +
+        field("Standard, outside $", "st_stdO", "number", null, qset.stdOut, ' inputmode="decimal"') +
+        field("Standard, in + out $", "st_stdB", "number", null, qset.stdBoth, ' inputmode="decimal"') +
+      "</div>" +
+      '<div class="grid2">' +
+        field("Target $/hour", "st_rate", "number", null, qset.targetRate, ' inputmode="decimal"') +
+        field("Travel fee $", "st_trav", "number", null, qset.travelFee, ' inputmode="decimal"') +
+      "</div>" +
+      '<button class="btn p full" id="sSaveRates">Save the rate card</button>' +
+    "</div>");
+
+    html(root, '<div class="card"><h3>Backup</h3>' +
+      '<div class="sub" style="margin-bottom:10px">A copy of everything, as a file. Worth doing before a big change even with sync on.</div>' +
+      '<button class="btn full" id="sExport">Download a backup</button></div>');
+
+    html(root, '<div class="card"><h3>On the PC</h3>' +
+      '<div class="sub">Window OS, the Diary, the Job Assistant, the Reply Desk, the quote calculator, ' +
+      'the invoice maker and the Books are all still there and all still work. This app is the same ' +
+      'data, cut down to what is worth doing one-handed.</div></div>');
+
+    document.getElementById("sSync").onclick = function () {
+      if (on1) { FNWCSync.syncNow().then(function () { toast("Synced"); render(); }); }
+      else FNWCSync.openPanel();
+    };
+    if (document.getElementById("sPanel")) {
+      document.getElementById("sPanel").onclick = function () { FNWCSync.openPanel(); };
+    }
+
+    document.getElementById("sSaveRates").onclick = function () {
+      qset.minSingle = num("st_minS"); qset.minDouble = num("st_minD");
+      qset.stdOut = num("st_stdO"); qset.stdBoth = num("st_stdB");
+      qset.targetRate = num("st_rate"); qset.travelFee = num("st_trav");
+      saveQ(); toast("Rate card saved");
+    };
+
+    document.getElementById("sExport").onclick = function () {
+      var blob = new Blob([JSON.stringify(db, null, 2)], { type: "application/json" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "fnwc-backup-" + todayISO() + ".json";
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      toast("Backup downloaded");
+    };
+  }
+
+  /* =========================================================================
+     BOOT
+     ====================================================================== */
+
+  $("#burger").onclick = function () { document.body.classList.toggle("nav"); };
+  $("#scrim").onclick = function () { document.body.classList.remove("nav"); };
+  $("#syncBtn").onclick = function () { FNWCSync.openPanel(); };
+
+  window.addEventListener("hashchange", function () { go(location.hash.slice(1)); });
+
+  FNWCSync.onStatus(function (state2, text) {
+    var b = $("#syncBtn");
+    b.className = state2 === "ok" ? "ok" : state2 === "busy" ? "busy" : state2 === "err" ? "err" : "";
+    b.querySelector(".lbl").textContent =
+      state2 === "ok" ? text.replace("Synced ", "") : state2 === "busy" ? "..." :
+      state2 === "err" ? "!" : "Sync";
+  });
+
+  /* When the PC changes something, redraw - but never on top of a form the
+     user is halfway through filling in. */
+  FNWCSync.onRemoteChange(function () {
+    if (sheet.classList.contains("open")) { toast("New data from the PC"); return; }
+    render();
+    toast("Updated from the PC");
+  });
+
+  /* Another tab on this same phone, e.g. the desktop tools opened side by
+     side on a laptop. */
+  window.addEventListener("storage", function (e) {
+    if (e.key === KEY && !sheet.classList.contains("open")) render();
+  });
+
+  go(location.hash.slice(1) || "today");
+})();
+</script>
+</body>
+</html>
