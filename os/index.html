@@ -248,7 +248,7 @@ window.FNWC_SYNC_NO_PILL = true;   /* this app draws its own sync button */
 /* Bumped whenever this file changes, so Settings can tell you which build you
    are actually looking at. Worth having: "is it even the new version?" is
    otherwise impossible to answer from a phone. */
-window.FNWC_BUILD = "2026-09-12b";
+window.FNWC_BUILD = "2026-09-12c";
 
 /* An app on the home screen will otherwise sit on a copy of this page from
    days ago. The worker fetches fresh every time and keeps a copy only for
@@ -275,6 +275,7 @@ if ("serviceWorker" in navigator) {
 }
 </script>
 <script src="fnwc-sync.js"></script>
+<script src="fnwc-followups.js"></script>
 <script>
 (function () {
   "use strict";
@@ -391,7 +392,15 @@ if ("serviceWorker" in navigator) {
     if (iso === t) return "Today";
     if (iso === addDays(t, 1)) return "Tomorrow";
     if (iso === addDays(t, -1)) return "Yesterday";
-    return d.toLocaleDateString("en-AU", { weekday: "short", day: "numeric", month: "short" });
+    /* The year only appears when it is not this one. Without it a job from
+       last November reads as this coming November, which is the difference
+       between a customer who is due and one who left a year ago. */
+    var o = { weekday: "short", day: "numeric", month: "short" };
+    if (d.getFullYear() !== new Date().getFullYear()) {
+      o.year = "numeric";
+      delete o.weekday;                  /* the weekday stops earning its space */
+    }
+    return d.toLocaleDateString("en-AU", o);
   }
   function custName(id) {
     var c = db.customers.filter(function (x) { return x.id === id; })[0];
@@ -482,6 +491,7 @@ if ("serviceWorker" in navigator) {
     { id: "jobs",      ico: "\u{1F9F9}", label: "Jobs" },
     { id: "leads",     ico: "\u{1F4E5}", label: "Leads" },
     { id: "customers", ico: "\u{1F464}", label: "Customers" },
+    { id: "followups", ico: "\u{1F514}", label: "Follow ups" },
     { sep: true },
     { id: "quote",     ico: "\u{1F4B2}", label: "Quote it" },
     { id: "reply",     ico: "\u{1F4AC}", label: "Reply desk" },
@@ -501,7 +511,8 @@ if ("serviceWorker" in navigator) {
       jobs: db.jobs.length,
       leads: db.leads.filter(function (l) { return l.stage !== "won" && l.stage !== "lost"; }).length,
       customers: db.customers.length,
-      books: db.expenses.length
+      books: db.expenses.length,
+      followups: FNWCFollowUps.summary(db, todayISO()).total
     };
   }
 
@@ -539,8 +550,8 @@ if ("serviceWorker" in navigator) {
     $("#view").innerHTML = "";
     ({
       today: vToday, diary: vDiary, jobs: vJobs, leads: vLeads,
-      customers: vCustomers, quote: vQuote, reply: vReply,
-      books: vBooks, settings: vSettings
+      customers: vCustomers, followups: vFollowups, quote: vQuote,
+      reply: vReply, books: vBooks, settings: vSettings
     })[view]($("#view"));
   }
 
@@ -590,6 +601,21 @@ if ("serviceWorker" in navigator) {
       '<button class="btn" data-a="exp">+ Expense</button>' +
       '<a class="btn" href="#quote">Quote it</a>' +
       "</div>");
+
+    /* The follow-ups are the thing that quietly makes the money, so they get
+       said out loud here rather than waiting to be found in the menu. */
+    var fu = FNWCFollowUps.summary(db, t);
+    if (fu.total) {
+      html(root, '<a class="card" href="#followups" style="display:block;text-decoration:none;color:inherit;' +
+        'border-color:var(--brand2)"><div class="spread"><h3>\u{1F514} ' + fu.total +
+        " follow up" + (fu.total === 1 ? "" : "s") + " waiting</h3>" +
+        '<span class="tag info">open</span></div>' +
+        '<div class="sub" style="margin-top:4px">' +
+        (fu.rebooks ? fu.rebooks + " to chase for another clean, about " + money(fu.expected) + " of work" : "") +
+        (fu.rebooks && fu.reviews ? ". " : "") +
+        (fu.reviews ? fu.reviews + " happy customer" + (fu.reviews === 1 ? "" : "s") + " to ask for a review" : "") +
+        ".</div></a>");
+    }
 
     html(root, "<h3 style=\"margin-bottom:8px\">" + niceDate(t) + "</h3>");
     if (!todays.length) {
@@ -1054,6 +1080,29 @@ if ("serviceWorker" in navigator) {
       (c.freqMonths ? '<div class="q-line"><span>Wants it every</span><b>' + c.freqMonths + " months</b></div>" : "");
     if (c.notes) h += '<div class="sub mt">' + esc(c.notes) + "</div>";
 
+    /* Everything the follow-up screen has decided about this person, in one
+       place and reversible. Without this, turning someone off is a one-way
+       door you cannot find again. */
+    var st = FNWCFollowUps.dueState(db, c, todayISO());
+    var bits = [];
+    if (c.rebookOff) bits.push(["Rebook chasing is off", "rbon", "Turn back on"]);
+    else if (c.rebookSnoozeUntil && c.rebookSnoozeUntil > todayISO())
+      bits.push(["Snoozed until " + niceDate(c.rebookSnoozeUntil), "rbon", "Clear snooze"]);
+    else if (c.rebookAskedAt) bits.push(["Asked about a rebook " + niceDate(c.rebookAskedAt), null, null]);
+    if (st.state && st.state !== "none" && st.dueISO)
+      bits.push(["Next clean due " + niceDate(st.dueISO), null, null]);
+    if (c.reviewState === "done") bits.push(["Left a review", "rvclear", "Clear"]);
+    else if (c.reviewState === "off") bits.push(["Never ask for a review", "rvclear", "Clear"]);
+    else if (c.reviewState === "asked") bits.push(["Asked for a review " + niceDate(c.reviewAskedAt), "rvclear", "Clear"]);
+
+    if (bits.length) {
+      h += '<hr class="sep"><div class="tiny" style="margin-bottom:6px">Follow ups</div>';
+      bits.forEach(function (b) {
+        h += '<div class="q-line"><span>' + esc(b[0]) + "</span>" +
+             (b[1] ? '<button class="btn sm" data-' + b[1] + '>' + esc(b[2]) + "</button>" : "") + "</div>";
+      });
+    }
+
     if (jobs.length) {
       h += '<h4 style="margin:16px 0 8px">History</h4>';
       jobs.slice(0, 12).forEach(function (j) {
@@ -1073,6 +1122,21 @@ if ("serviceWorker" in navigator) {
       { label: "Edit", on: function () { closeSheet(); editCustomer(c); } },
       { label: "Delete", cls: "d", on: function () { deleteCustomer(c); } }
     ]);
+
+    on("[data-rbon]", function () {
+      if (commit(function (f) {
+        FNWCFollowUps.stopRebook(f, id, false);
+        var t = f.customers.filter(function (x) { return x.id === id; })[0];
+        if (t) { delete t.rebookSnoozeUntil; delete t.rebookAskedAt; }
+      })) { closeSheet(); toast("Back on the chase list"); render(); }
+    }, $("#sheetBody"));
+
+    on("[data-rvclear]", function () {
+      if (commit(function (f) {
+        var t = f.customers.filter(function (x) { return x.id === id; })[0];
+        if (t) { delete t.reviewState; delete t.reviewAskedAt; }
+      })) { closeSheet(); toast("Review status cleared"); render(); }
+    }, $("#sheetBody"));
   }
 
   /* Deleting a customer is the one delete in here that can damage something
@@ -1168,6 +1232,229 @@ if ("serviceWorker" in navigator) {
             else f.customers.forEach(function (x) { if (x.id === c.id) Object.assign(x, rec); });
           });
           if (ok) { closeSheet(); toast("Saved"); render(); }
+        } }
+    ]);
+  }
+
+  /* ------------------------------------------------------------ FOLLOW UPS
+     The two jobs that make the most money and get done the least: getting
+     people back in, and asking the happy ones for a review. Both are ten
+     minutes of texting that nobody ever quite gets around to, so the whole
+     screen is built to be worked top to bottom in one sitting.
+     --------------------------------------------------------------------- */
+
+  /* iOS wants sms:number&body=, Android wants sms:number?body=. Putting "?&"
+     in keeps both of them happy, which is a well-worn hack rather than
+     anything clever. */
+  function smsLink(phone, body) {
+    return "sms:" + tel(phone) + "?&body=" + encodeURIComponent(body);
+  }
+
+  function vFollowups(root) {
+    var today = todayISO();
+    var tab = state.ft || "rebook";
+    var rebook = FNWCFollowUps.rebooks(db, today);
+    var revs = FNWCFollowUps.reviews(db, today);
+    var sum = FNWCFollowUps.summary(db, today);
+
+    html(root, '<div class="grid3" style="margin-bottom:12px">' +
+      '<div class="stat"><b>' + rebook.length + "</b><span>to chase</span></div>" +
+      '<div class="stat"><b class="money">' + money(sum.expected) + "</b><span>likely worth</span></div>" +
+      '<div class="stat"><b>' + revs.length + "</b><span>to ask</span></div>" +
+      "</div>");
+
+    html(root, '<div class="seg" style="margin-bottom:12px">' +
+      '<button data-ft="rebook" class="' + (tab === "rebook" ? "on" : "") + '">Rebook' +
+        (rebook.length ? " (" + rebook.length + ")" : "") + "</button>" +
+      '<button data-ft="review" class="' + (tab === "review" ? "on" : "") + '">Reviews' +
+        (revs.length ? " (" + revs.length + ")" : "") + "</button>" +
+      "</div>");
+
+    if (tab === "rebook") drawRebooks(root, rebook, today);
+    else drawReviews(root, revs, today);
+
+    on("[data-ft]", function (e) { state.ft = e.dataset.ft; render(); }, root);
+  }
+
+  var STATE_TAG = { soon: "info", overdue: "warn", atrisk: "bad" };
+  var STATE_WORD = { soon: "due soon", overdue: "overdue", atrisk: "drifting away" };
+
+  function drawRebooks(root, list, today) {
+    if (!list.length) {
+      var parked = FNWCFollowUps.rebookSkipped(db, today);
+      html(root, '<div class="card">' + empty("✅", "Nobody to chase",
+        "Everyone on a cycle is either booked in or not due yet.") + "</div>");
+      /* An empty screen should say why it is empty, or it just looks broken. */
+      if (parked.length) {
+        html(root, '<div class="card"><h3 style="margin-bottom:8px">Parked for now</h3>' +
+          parked.map(function (p) {
+            return '<div class="q-line"><span>' + esc(p.customer.name) + "</span>" +
+                   '<b class="tiny">' + esc(p.reason) + "</b></div>";
+          }).join("") + "</div>");
+      }
+      return;
+    }
+
+    html(root, '<div class="tiny" style="margin-bottom:10px">Work down the list. Each one opens a ' +
+      "text with the message already written.</div>");
+
+    list.forEach(function (r) {
+      var c = r.customer;
+      html(root, '<div class="card" data-rb="' + esc(c.id) + '">' +
+        '<div class="spread"><h3>' + esc(c.name) + "</h3>" +
+        '<span class="tag ' + (STATE_TAG[r.state] || "") + '">' + STATE_WORD[r.state] + "</span></div>" +
+        '<div class="sub" style="margin:6px 0 8px">' + esc(r.why) + "</div>" +
+        '<div class="wrap" style="margin-bottom:10px">' +
+          '<span class="tag">' + esc(c.suburb || "no suburb") + "</span>" +
+          '<span class="tag">' + money(r.value) + " a clean</span>" +
+          '<span class="tag">every ' + esc(c.freqMonths) + " months</span>" +
+        "</div>" +
+        '<div class="grid2">' +
+          (c.phone ? '<a class="btn p" data-text href="' + esc(smsLink(c.phone, r.message)) + '">Text them</a>'
+                   : '<button class="btn" data-nonum>No phone number</button>') +
+          '<button class="btn" data-copy>Copy text</button>' +
+        "</div>" +
+        '<div class="wrap mt">' +
+          '<button class="chip" data-booked>They booked</button>' +
+          '<button class="chip" data-snooze>Not yet</button>' +
+          '<button class="chip" data-stop>Stop asking</button>' +
+        "</div></div>");
+    });
+
+    root.querySelectorAll("[data-rb]").forEach(function (card) {
+      var cid = card.dataset.rb;
+      var r = list.filter(function (x) { return x.customer.id === cid; })[0];
+      var c = r.customer;
+
+      var asked = function (msg) {
+        if (commit(function (f) { FNWCFollowUps.markRebookAsked(f, cid, todayISO()); })) {
+          toast(msg); render();
+        }
+      };
+
+      var t = card.querySelector("[data-text]");
+      /* Opening the messages app counts as having asked. Over-marking by one
+         is far better than texting somebody twice in a week. */
+      if (t) t.onclick = function () { setTimeout(function () { asked("Marked as asked"); }, 700); };
+
+      var nn = card.querySelector("[data-nonum]");
+      if (nn) nn.onclick = function () { toast("No number saved - add one on their card"); };
+
+      card.querySelector("[data-copy]").onclick = function () {
+        copy(r.message); asked("Copied, and marked as asked");
+      };
+
+      card.querySelector("[data-booked]").onclick = function () {
+        /* Straight into a new job for them, which is the whole point. */
+        if (!commit(function (f) { FNWCFollowUps.markRebookAsked(f, cid, todayISO()); })) return;
+        editJob({ id: "", customerId: cid, date: todayISO(), suburb: c.suburb || "",
+                  services: "", price: Math.round(r.value) || "", estMin: "",
+                  travelMin: db.settings.travelDefault || 30, km: "", status: "scheduled", actualMin: "" });
+      };
+
+      card.querySelector("[data-snooze]").onclick = function () { snoozeSheet(c); };
+
+      card.querySelector("[data-stop]").onclick = function () {
+        if (!confirm("Stop chasing " + c.name + " for rebooks?\n\nYou can turn it back on from their customer card.")) return;
+        if (commit(function (f) { FNWCFollowUps.stopRebook(f, cid, true); })) {
+          toast("Will not chase them again"); render();
+        }
+      };
+    });
+  }
+
+  function snoozeSheet(c) {
+    var h = '<div class="sub">When should ' + esc(FNWCFollowUps.firstName(c)) +
+      " come back up? They drop off the list until then.</div>" +
+      '<div class="wrap mt">' +
+        [[14, "2 weeks"], [30, "1 month"], [60, "2 months"], [90, "3 months"], [180, "6 months"]]
+          .map(function (o) { return '<button class="chip" data-d="' + o[0] + '">' + o[1] + "</button>"; })
+          .join("") + "</div>";
+    openSheet("Not yet", h, [{ label: "Cancel", on: closeSheet }]);
+    on("[data-d]", function (e) {
+      var d = parseInt(e.dataset.d, 10);
+      if (commit(function (f) { FNWCFollowUps.snoozeRebook(f, c.id, d, todayISO()); })) {
+        closeSheet(); toast("Back in " + d + " days"); render();
+      }
+    }, $("#sheetBody"));
+  }
+
+  function drawReviews(root, list, today) {
+    var url = (db.settings || {}).reviewUrl;
+    if (!url) {
+      html(root, '<div class="card" style="border-color:var(--warn)">' +
+        "<h3>Add your Google review link first</h3>" +
+        '<div class="sub mt">Without it the message just asks people to go and find you, ' +
+        "and almost nobody does. It is the single thing that decides whether this works.</div>" +
+        '<button class="btn p full mt" data-seturl>Add the link</button></div>');
+      on("[data-seturl]", function () { reviewUrlSheet(); }, root);
+    }
+
+    if (!list.length) {
+      html(root, '<div class="card">' + empty("⭐", "Nobody to ask right now",
+        "People show up here a couple of days after you finish their job.") + "</div>");
+      return;
+    }
+
+    html(root, '<div class="tiny" style="margin-bottom:10px">Asked once each, not once a clean. ' +
+      "Regulars are at the top - they are the ones who actually write them.</div>");
+
+    list.forEach(function (r) {
+      var c = r.customer;
+      html(root, '<div class="card" data-rv="' + esc(c.id) + '">' +
+        '<div class="spread"><h3>' + esc(c.name) + "</h3>" +
+        (r.repeat ? '<span class="tag good">' + r.jobCount + " cleans</span>"
+                  : '<span class="tag">first clean</span>') + "</div>" +
+        '<div class="sub" style="margin:6px 0 10px">' + esc(r.why) + "</div>" +
+        '<div class="grid2">' +
+          (c.phone ? '<a class="btn p" data-text href="' + esc(smsLink(c.phone, r.message)) + '">Text them</a>'
+                   : '<button class="btn" data-nonum>No phone number</button>') +
+          '<button class="btn" data-copy>Copy text</button>' +
+        "</div>" +
+        '<div class="wrap mt">' +
+          '<button class="chip" data-left>They left one</button>' +
+          '<button class="chip" data-never>Do not ask</button>' +
+        "</div></div>");
+    });
+
+    root.querySelectorAll("[data-rv]").forEach(function (card) {
+      var cid = card.dataset.rv;
+      var r = list.filter(function (x) { return x.customer.id === cid; })[0];
+
+      var mark = function (st, msg) {
+        if (commit(function (f) { FNWCFollowUps.markReview(f, cid, st, todayISO()); })) {
+          toast(msg); render();
+        }
+      };
+
+      var t = card.querySelector("[data-text]");
+      if (t) t.onclick = function () { setTimeout(function () { mark("asked", "Marked as asked"); }, 700); };
+
+      var nn = card.querySelector("[data-nonum]");
+      if (nn) nn.onclick = function () { toast("No number saved - add one on their card"); };
+
+      card.querySelector("[data-copy]").onclick = function () {
+        copy(r.message); mark("asked", "Copied, and marked as asked");
+      };
+      card.querySelector("[data-left]").onclick = function () { mark("done", "Good one. Never asked again"); };
+      card.querySelector("[data-never]").onclick = function () { mark("off", "Will not ask them"); };
+    });
+  }
+
+  function reviewUrlSheet() {
+    var h = field("Your Google review link", "ru_url", "url", null, (db.settings || {}).reviewUrl || "",
+      ' placeholder="https://g.page/r/..."') +
+      '<div class="tiny">On the PC, search Google for Far North Window Cleaning, open your business ' +
+      'profile, and use <b>Ask for reviews</b> - it gives you a short link. Paste it here once and every ' +
+      "review message from now on has it in.</div>";
+    openSheet("Google review link", h, [
+      { label: "Cancel", on: closeSheet },
+      { label: "Save", cls: "p", on: function () {
+          var u = val("ru_url");
+          if (u && !/^https?:\/\//i.test(u)) { toast("Needs to start with https://"); return; }
+          if (commit(function (f) { f.settings = f.settings || {}; f.settings.reviewUrl = u; })) {
+            closeSheet(); toast(u ? "Link saved" : "Link cleared"); render();
+          }
         } }
     ]);
   }
@@ -1844,6 +2131,19 @@ if ("serviceWorker" in navigator) {
       '<button class="btn p full" id="sSaveRates">Save the rate card</button>' +
     "</div>");
 
+    html(root, '<div class="card"><h3>Follow ups</h3>' +
+      '<div class="sub" style="margin-bottom:10px">The review link goes into every review message. ' +
+      "Without it people have to go and find you, and they will not.</div>" +
+      field("Google review link", "st_rurl", "url", null, (db.settings || {}).reviewUrl || "",
+        ' placeholder="https://g.page/r/..."') +
+      '<div class="grid2">' +
+        field("Ask for a review after (days)", "st_rafter", "number", null,
+          db.settings.reviewAfter == null ? 2 : db.settings.reviewAfter, ' inputmode="numeric"') +
+        field("Stay quiet after asking (days)", "st_rquiet", "number", null,
+          db.settings.rebookQuiet == null ? 14 : db.settings.rebookQuiet, ' inputmode="numeric"') +
+      "</div>" +
+      '<button class="btn p full" id="sSaveFu">Save</button></div>');
+
     html(root, '<div class="card"><h3>Backup</h3>' +
       '<div class="sub" style="margin-bottom:10px">A copy of everything, as a file. Worth doing before a big change even with sync on.</div>' +
       '<button class="btn full" id="sExport">Download a backup</button></div>');
@@ -1880,6 +2180,17 @@ if ("serviceWorker" in navigator) {
       }
       Promise.all(jobs)["catch"](function () {})
         .then(function () { location.replace(location.pathname + "?u=" + Date.now()); });
+    };
+
+    document.getElementById("sSaveFu").onclick = function () {
+      var u = val("st_rurl");
+      if (u && !/^https?:\/\//i.test(u)) { toast("The link needs to start with https://"); return; }
+      if (commit(function (f) {
+        f.settings = f.settings || {};
+        f.settings.reviewUrl = u;
+        f.settings.reviewAfter = int("st_rafter");
+        f.settings.rebookQuiet = int("st_rquiet");
+      })) { toast("Saved"); render(); }
     };
 
     document.getElementById("sSaveRates").onclick = function () {

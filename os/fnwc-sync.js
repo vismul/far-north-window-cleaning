@@ -76,6 +76,29 @@
     return clone(mine);                      /* both moved, or neither did */
   }
 
+  /* When both devices touched the same record, merging the whole thing in
+     one lump means the loser's change vanishes - edit a phone number on the
+     PC while the phone snoozes that same customer, and the snooze is gone.
+     Going field by field keeps both, and only a genuine clash on the same
+     field falls back to "the device you are on wins". */
+  function mergeRecord(base, mine, theirs) {
+    if (typeof mine !== "object" || mine === null || Array.isArray(mine)) {
+      return mergeValue(base, mine, theirs);
+    }
+    if (typeof theirs !== "object" || theirs === null || Array.isArray(theirs)) {
+      return mergeValue(base, mine, theirs);
+    }
+    var out = {}, keys = {};
+    [base || {}, mine, theirs].forEach(function (o) {
+      Object.keys(o).forEach(function (k) { keys[k] = 1; });
+    });
+    Object.keys(keys).forEach(function (k) {
+      var v = mergeValue((base || {})[k], mine[k], theirs[k]);
+      if (v !== undefined) out[k] = v;
+    });
+    return out;
+  }
+
   function indexById(list) {
     var m = {};
     (list || []).forEach(function (r) {
@@ -104,7 +127,7 @@
            only happens if two devices minted the same id - vanishingly rare. */
         return clone(iHaveIt ? m : t);
       }
-      return mergeValue(b, m, t);
+      return mergeRecord(b, m, t);
     }
 
     (mine || []).forEach(function (r) {
