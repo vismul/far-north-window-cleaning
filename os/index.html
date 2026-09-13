@@ -55,6 +55,11 @@ header#top{
 }
 #burger span{display:block;width:17px;height:2px;background:var(--ink);border-radius:2px;box-shadow:0 -5px 0 var(--ink),0 5px 0 var(--ink)}
 #title{font-size:17px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#searchBtn{
+  flex:none;width:40px;height:40px;border:1px solid var(--line);background:var(--panel);
+  border-radius:11px;font-size:15px;cursor:pointer;line-height:1
+}
+body.searching #searchBtn{background:var(--brand2)}
 #syncBtn{
   flex:none;border:1px solid var(--line);background:var(--panel);border-radius:999px;
   padding:8px 11px;display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--dim);cursor:pointer
@@ -94,6 +99,11 @@ body.nav nav#side{transform:none}
 #side a.nav.on{background:var(--brand2);color:#04121f}
 #side a.nav.on .cnt{background:rgba(0,0,0,.2);border-color:transparent;color:#04121f}
 #side .sep{height:1px;background:var(--line);margin:8px 10px}
+#side .ghead{
+  font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--faint);padding:14px 12px 5px
+}
+#side .ghead:first-child{padding-top:6px}
 #side .foot{padding:10px 16px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--faint)}
 
 @media(min-width:900px){
@@ -195,9 +205,34 @@ select.in{appearance:none;background-image:linear-gradient(45deg,transparent 50%
 #toast{
   position:fixed;left:50%;transform:translateX(-50%);bottom:calc(var(--sab) + 20px);z-index:90;
   background:#e8eefb;color:#0b1220;padding:11px 17px;border-radius:999px;font-weight:700;font-size:14px;
-  box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .2s
+  box-shadow:0 8px 24px rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .2s;
+  display:flex;align-items:center;gap:12px;max-width:calc(100vw - 24px)
 }
 #toast.show{opacity:1}
+#toast.act{pointer-events:auto}
+#toast button{
+  border:0;background:#0b1220;color:#e8eefb;border-radius:999px;padding:7px 14px;
+  font-weight:700;font-size:13px;cursor:pointer;flex:none
+}
+
+.shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.shot{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.shot img{width:100%;height:100%;object-fit:cover;display:block}
+.shot .x{
+  position:absolute;top:4px;right:4px;width:26px;height:26px;border:0;border-radius:50%;
+  background:rgba(2,6,16,.72);color:#fff;font-size:16px;line-height:1;cursor:pointer
+}
+.shot .lbl{
+  position:absolute;left:4px;bottom:4px;background:rgba(2,6,16,.72);color:#e8eefb;
+  font-size:10px;font-weight:700;padding:2px 7px;border-radius:999px;text-transform:uppercase
+}
+
+/* ---- search ---- */
+#searchWrap{padding:0 12px 10px;max-width:760px;margin:0 auto;display:none}
+body.searching #searchWrap{display:block}
+#searchIn{width:100%}
+.sres{margin-top:8px}
+.sres .kind{font-size:11px;color:var(--faint);text-transform:uppercase;letter-spacing:.08em;margin:12px 0 4px;font-weight:700}
 
 .money{font-variant-numeric:tabular-nums}
 hr.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
@@ -228,8 +263,13 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:14px 0}
   <header id="top">
     <button id="burger" aria-label="Menu"><span></span></button>
     <div id="title">Today</div>
+    <button id="searchBtn" aria-label="Search">🔍</button>
     <button id="syncBtn"><span class="dot"></span><span class="lbl">Sync</span></button>
   </header>
+  <div id="searchWrap">
+    <input class="in" id="searchIn" type="search" placeholder="Search a name, suburb, invoice or note">
+    <div class="sres" id="searchRes"></div>
+  </div>
   <main id="view"></main>
 </div>
 
@@ -248,7 +288,7 @@ window.FNWC_SYNC_NO_PILL = true;   /* this app draws its own sync button */
 /* Bumped whenever this file changes, so Settings can tell you which build you
    are actually looking at. Worth having: "is it even the new version?" is
    otherwise impossible to answer from a phone. */
-window.FNWC_BUILD = "2026-09-12g";
+window.FNWC_BUILD = "2026-09-14a";
 
 /* An app on the home screen will otherwise sit on a copy of this page from
    days ago. The worker fetches fresh every time and keeps a copy only for
@@ -280,6 +320,8 @@ if ("serviceWorker" in navigator) {
 <script src="fnwc-geo.js"></script>
 <script src="fnwc-calibrate.js"></script>
 <script src="fnwc-enquiry.js"></script>
+<script src="fnwc-vehicle.js"></script>
+<script src="fnwc-import.js"></script>
 <script>
 (function () {
   "use strict";
@@ -388,6 +430,18 @@ if ("serviceWorker" in navigator) {
   function daysBetween(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000); }
   function daysAgo(iso) { return iso ? daysBetween(iso, todayISO()) : null; }
   function addDays(iso, n) { var d = new Date(iso); d.setDate(d.getDate() + n); return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+
+  /* Months, not 30-day blocks - three months on from the 31st of August is the
+     30th of November, not the 1st of December. */
+  function addMonthsISO(iso, n) {
+    var d = new Date(iso + "T00:00:00");
+    if (isNaN(d)) return iso;
+    var day = d.getDate();
+    var out = new Date(d.getFullYear(), d.getMonth() + n, 1);
+    var last = new Date(out.getFullYear(), out.getMonth() + 1, 0).getDate();
+    out.setDate(Math.min(day, last));
+    return out.getFullYear() + "-" + pad(out.getMonth() + 1) + "-" + pad(out.getDate());
+  }
   function niceDate(iso) {
     if (!iso) return "";
     var d = new Date(iso + "T00:00:00");
@@ -406,6 +460,18 @@ if ("serviceWorker" in navigator) {
     }
     return d.toLocaleDateString("en-AU", o);
   }
+  /* niceDate says "Today" and "Yesterday", which is right nearly everywhere
+     and wrong at either end of a date range - "Today to Sun 6 Dec" reads like
+     a mistake. This is the plain form for ranges. */
+  function plainDate(iso) {
+    if (!iso) return "";
+    var d = new Date(iso + "T00:00:00");
+    if (isNaN(d)) return iso;
+    var o = { day: "numeric", month: "short" };
+    if (d.getFullYear() !== new Date().getFullYear()) o.year = "numeric";
+    return d.toLocaleDateString("en-AU", o);
+  }
+
   function custName(id) {
     var c = db.customers.filter(function (x) { return x.id === id; })[0];
     return c ? c.name : "(unknown)";
@@ -417,8 +483,62 @@ if ("serviceWorker" in navigator) {
 
   function toast(msg) {
     var t = $("#toast");
-    t.textContent = msg; t.classList.add("show");
-    clearTimeout(t._h); t._h = setTimeout(function () { t.classList.remove("show"); }, 2000);
+    t.textContent = msg;
+    t.className = "show";
+    clearTimeout(t._h); t._h = setTimeout(function () { t.className = ""; }, 2000);
+  }
+
+  /* ---------- undo -------------------------------------------------------
+     A dialog asking "are you sure?" stops you every single time to guard
+     against the rare slip, and people learn to tap through it without
+     reading - which is the worst of both. Doing the thing and offering it
+     back for a few seconds is faster to use and safer in practice.
+
+     The snapshot is the whole store, which is only tens of kilobytes and
+     removes any chance of a partial undo putting things in a state that never
+     existed. Sync is told to hold off while the offer stands, so an undone
+     change is never pushed to the other device and pulled back.
+     --------------------------------------------------------------------- */
+
+  var undoTimer = null, undoSnapshot = null;
+
+  function doWithUndo(label, change, opts) {
+    opts = opts || {};
+    var before = localStorage.getItem(KEY);
+    if (!commit(change)) return false;
+
+    undoSnapshot = before;
+    var t = $("#toast");
+    t.textContent = "";
+    t.appendChild(document.createTextNode(label));
+
+    var b = document.createElement("button");
+    b.type = "button";
+    b.textContent = "Undo";
+    b.onclick = function () {
+      clearTimeout(undoTimer);
+      t.className = "";
+      if (undoSnapshot != null) {
+        try { localStorage.setItem(KEY, undoSnapshot); } catch (e) {}
+        undoSnapshot = null;
+      }
+      toast("Put back");
+      if (opts.after) opts.after();
+      render();
+    };
+    t.appendChild(b);
+
+    t.className = "show act";
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(function () {
+      t.className = "";
+      undoSnapshot = null;
+      /* Only now is it really gone, so anything that cannot be undone - a
+         server-side delete - waits until here. */
+      if (opts.commit) opts.commit();
+    }, 6000);
+
+    return true;
   }
 
   function copy(text) {
@@ -491,19 +611,21 @@ if ("serviceWorker" in navigator) {
 
   var NAV = [
     { id: "today",     ico: "☀", label: "Today" },
+    { head: "The work" },
     { id: "diary",     ico: "\u{1F4C5}", label: "Diary" },
     { id: "jobs",      ico: "\u{1F9F9}", label: "Jobs" },
+    { head: "People" },
     { id: "inbox",     ico: "\u{1F4EC}", label: "Website inbox" },
     { id: "leads",     ico: "\u{1F4E5}", label: "Leads" },
     { id: "customers", ico: "\u{1F464}", label: "Customers" },
     { id: "followups", ico: "\u{1F514}", label: "Follow ups" },
-    { id: "money", ico: "\u{1F4B0}", label: "Getting paid" },
-    { id: "pricing", ico: "\u{1F4C8}", label: "Are you charging enough" },
-    { sep: true },
+    { head: "Money" },
+    { id: "money",     ico: "\u{1F4B0}", label: "Getting paid" },
+    { id: "books",     ico: "\u{1F4D2}", label: "Books, car & tax" },
+    { id: "pricing",   ico: "\u{1F4C8}", label: "Are you charging enough" },
+    { head: "Tools" },
     { id: "quote",     ico: "\u{1F4B2}", label: "Quote it" },
     { id: "reply",     ico: "\u{1F4AC}", label: "Reply desk" },
-    { id: "books",     ico: "\u{1F4D2}", label: "The books" },
-    { sep: true },
     { id: "settings",  ico: "⚙", label: "Settings & sync" }
   ];
 
@@ -529,6 +651,7 @@ if ("serviceWorker" in navigator) {
     var c = counts(), h = "";
     NAV.forEach(function (n) {
       if (n.sep) { h += '<div class="sep"></div>'; return; }
+      if (n.head) { h += '<div class="ghead">' + esc(n.head) + "</div>"; return; }
       var badge = c[n.id];
       h += '<a class="nav' + (view === n.id ? " on" : "") + '" href="#' + n.id + '">' +
            '<span class="ico">' + n.ico + "</span>" + esc(n.label) +
@@ -818,15 +941,67 @@ if ("serviceWorker" in navigator) {
         .map(function (s) { return '<button class="chip" data-s="' + s[0] + '">' + s[1] + "</button>"; }).join("") +
       "</div></div>";
 
+    /* Before and after. Your dispute protection and your marketing in one, and
+       the only place a photo of the actual work has ever been able to live. */
+    var shots = j.photos || [];
+    h += '<hr class="sep"><div class="spread"><span class="tiny">Photos</span>' +
+      '<button class="btn sm" data-addshot>Add a photo</button></div>' +
+      '<input type="file" id="jp_file" accept="image/*" capture="environment" hidden>' +
+      (shots.length
+        ? '<div class="shots mt">' + shots.map(function (p, i) {
+            return '<div class="shot"><img src="' + esc(p.src) + '" alt="">' +
+              '<button class="x" data-delshot="' + i + '">×</button>' +
+              (p.tag ? '<span class="lbl">' + esc(p.tag) + "</span>" : "") + "</div>";
+          }).join("") + "</div>"
+        : '<div class="tiny mt">Nothing yet. A before and after is worth having if anyone ever ' +
+          "queries the job, and it is the best marketing you will get for free.</div>");
+
     openSheet("Job", h, [
       { label: "Edit", on: function () { closeSheet(); editJob(j); } },
       { label: "Delete", cls: "d", on: function () {
-          if (!confirm("Delete this job?\n\nIt goes from the phone and the PC both.")) return;
-          if (commit(function (f) { f.jobs = f.jobs.filter(function (x) { return x.id !== id; }); })) {
-            closeSheet(); toast("Job deleted"); render();
-          }
+          closeSheet();
+          doWithUndo("Job deleted", function (f) {
+            f.jobs = f.jobs.filter(function (x) { return x.id !== id; });
+          });
+          render();
         } }
     ]);
+
+    (function () {
+      var file = document.getElementById("jp_file");
+      var add = $("#sheetBody [data-addshot]");
+      if (!file || !add) return;
+      add.onclick = function () { file.click(); };
+
+      file.onchange = function (ev) {
+        var f = ev.target.files && ev.target.files[0];
+        if (!f) return;
+        toast("Shrinking the photo...");
+        shrinkImage(f, 1400, 0.6, function (dataUrl) {
+          if (!dataUrl) { toast("That image could not be read"); return; }
+          /* First one on a job that is not finished is the before shot. */
+          var tag = (j.photos || []).length ? "after" : "before";
+          if (commit(function (fdb) {
+            fdb.jobs.forEach(function (x) {
+              if (x.id !== id) return;
+              x.photos = (x.photos || []).concat([{ src: dataUrl, tag: tag, at: todayISO() }]);
+            });
+          })) { closeSheet(); toast("Photo added"); render(); jobSheet(id); }
+        });
+      };
+
+      on("[data-delshot]", function (b) {
+        var i = parseInt(b.dataset.delshot, 10);
+        closeSheet();
+        doWithUndo("Photo removed", function (fdb) {
+          fdb.jobs.forEach(function (x) {
+            if (x.id !== id) return;
+            x.photos = (x.photos || []).filter(function (_, n) { return n !== i; });
+          });
+        });
+        render();
+      }, $("#sheetBody"));
+    })();
 
     on("[data-s]", function (e) {
       var s = e.dataset.s;
@@ -900,6 +1075,32 @@ if ("serviceWorker" in navigator) {
     on("[data-m]", function (e) { saveTime(parseInt(e.dataset.m, 10)); }, $("#sheetBody"));
   }
 
+  /* A raw phone photo is three or four megabytes. localStorage gives you about
+     five in total and every byte also has to go up to Firestore, so nothing
+     gets stored until it has been squeezed. */
+  function shrinkImage(file, maxPx, quality, done) {
+    var fr = new FileReader();
+    fr.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var w = img.width, h = img.height;
+        if (w > maxPx || h > maxPx) {
+          var s = Math.min(maxPx / w, maxPx / h);
+          w = Math.round(w * s); h = Math.round(h * s);
+        }
+        var cv = document.createElement("canvas");
+        cv.width = w; cv.height = h;
+        cv.getContext("2d").drawImage(img, 0, 0, w, h);
+        try { done(cv.toDataURL("image/jpeg", quality)); }
+        catch (e) { done(null); }
+      };
+      img.onerror = function () { done(null); };
+      img.src = fr.result;
+    };
+    fr.onerror = function () { done(null); };
+    fr.readAsDataURL(file);
+  }
+
   function fmtMins(m) {
     m = +m || 0;
     if (m < 60) return m + "m";
@@ -932,11 +1133,21 @@ if ("serviceWorker" in navigator) {
         field("Km round trip", "jf_km", "number", null, j.km, ' inputmode="decimal"') +
       "</div>" +
       field("Status", "jf_status", "select", JOB_STATUS, j.status) +
-      (isNew ? "" : field("Actually took (min)", "jf_act", "number", null, j.actualMin, ' inputmode="numeric"'));
+      (isNew ? "" : field("Actually took (min)", "jf_act", "number", null, j.actualMin, ' inputmode="numeric"')) +
+      /* Booking the whole cycle at once. A booked job is worth far more than a
+         reminder to ring someone about booking one. */
+      (isNew ? '<label class="f"><span>Book the next ones too</span>' +
+        '<select class="in" id="jf_repeat">' +
+          '<option value="0">Just this one</option>' +
+          '<option value="3">Every 3 months, next 4 visits</option>' +
+          '<option value="6">Every 6 months, next 2 visits</option>' +
+          '<option value="12">Once a year, next 2 visits</option>' +
+        "</select></label>" : "");
 
     openSheet(isNew ? "New job" : "Edit job", h, [
       { label: "Cancel", on: closeSheet },
       { label: "Save", cls: "p", on: function () {
+          var repeated = 0;
           var cid = val("jf_cust");
           var newName = val("jf_name");
           if (!cid && !newName) { toast("Who is it for?"); document.getElementById("jf_name").focus(); return; }
@@ -963,11 +1174,38 @@ if ("serviceWorker" in navigator) {
             if (isNew) {
               rec.id = uid();
               f.jobs.push(rec);
+
+              /* The whole cycle in one go. Each repeat is the same job moved
+                 on by the interval, and the customer's cycle is set to match
+                 so the rebook chaser stays consistent with what is booked. */
+              var every = parseInt(val("jf_repeat"), 10) || 0;
+              if (every > 0) {
+                var howMany = every <= 3 ? 3 : 1;      /* plus the one just made */
+                for (var n = 1; n <= howMany; n++) {
+                  var next = Object.assign({}, rec, {
+                    id: uid(),
+                    date: addMonthsISO(rec.date, every * n),
+                    status: "scheduled"
+                  });
+                  delete next.actualMin;
+                  f.jobs.push(next);
+                }
+                f.customers.forEach(function (x) {
+                  if (x.id === cid && !x.freqMonths) x.freqMonths = every;
+                });
+                repeated = howMany;
+              }
             } else {
               f.jobs.forEach(function (x) { if (x.id === j.id) Object.assign(x, rec); });
             }
           });
-          if (ok) { closeSheet(); toast(isNew ? "Job booked in" : "Saved"); render(); }
+          if (ok) {
+            closeSheet();
+            toast(!isNew ? "Saved"
+              : repeated ? "Booked in, plus the next " + repeated
+              : "Job booked in");
+            render();
+          }
         } }
     ]);
 
@@ -1095,10 +1333,11 @@ if ("serviceWorker" in navigator) {
     openSheet("Lead", h, [
       { label: "Edit", on: function () { closeSheet(); editLead(l); } },
       { label: "Delete", cls: "d", on: function () {
-          if (!confirm("Delete this lead?")) return;
-          if (commit(function (f) { f.leads = f.leads.filter(function (x) { return x.id !== id; }); })) {
-            closeSheet(); toast("Lead deleted"); render();
-          }
+          closeSheet();
+          doWithUndo("Lead deleted", function (f) {
+            f.leads = f.leads.filter(function (x) { return x.id !== id; });
+          });
+          render();
         } }
     ]);
 
@@ -1323,16 +1562,15 @@ if ("serviceWorker" in navigator) {
                     .reduce(function (s, j) { return s + (+j.price || 0); }, 0);
 
     function wipe(alsoJobs) {
-      var ok = commit(function (f) {
-        f.customers = f.customers.filter(function (x) { return x.id !== c.id; });
-        if (alsoJobs) f.jobs = f.jobs.filter(function (x) { return x.customerId !== c.id; });
-      });
-      if (ok) {
-        closeSheet();
-        toast(alsoJobs && jobs.length ? "Customer and " + jobs.length + " job" +
-              (jobs.length === 1 ? "" : "s") + " deleted" : "Customer deleted");
-        render();
-      }
+      closeSheet();
+      doWithUndo(alsoJobs && jobs.length
+                   ? "Customer and " + jobs.length + " job" + (jobs.length === 1 ? "" : "s") + " deleted"
+                   : "Customer deleted",
+        function (f) {
+          f.customers = f.customers.filter(function (x) { return x.id !== c.id; });
+          if (alsoJobs) f.jobs = f.jobs.filter(function (x) { return x.customerId !== c.id; });
+        });
+      render();
     }
 
     if (!jobs.length) {
@@ -1368,10 +1606,10 @@ if ("serviceWorker" in navigator) {
       { label: "Cancel", cls: "p", on: function () { custSheet(c.id); } }
     ]);
 
-    on("[data-all]", function () {
-      if (confirm("Delete " + c.name + " and all " + jobs.length + " of their jobs?\n\n" +
-                  "This cannot be undone, and it happens on the PC too.")) wipe(true);
-    }, $("#sheetBody"));
+    /* The two cards above already spell out exactly what each choice does, so
+       a dialog on top is one more thing to tap through without reading. The
+       undo offer is the safety net instead. */
+    on("[data-all]", function () { wipe(true); }, $("#sheetBody"));
 
     on("[data-keep]", function () { wipe(false); }, $("#sheetBody"));
   }
@@ -1506,12 +1744,41 @@ if ("serviceWorker" in navigator) {
         toast("Added to leads"); render();
       };
 
+      /* This one lives on the server, so there is no local snapshot to put
+         back. It disappears from the list straight away and the actual delete
+         is held until the undo offer has run out. */
       card.querySelector("[data-bin]").onclick = function () {
-        if (!confirm("Bin this enquiry?\n\nIt is gone for good.")) return;
-        FNWCEnquiry.remove(FNWCSync, id).then(function () {
-          inboxCache = inboxCache.filter(function (x) { return x.id !== id; });
-          toast("Binned"); render();
-        })["catch"](function (err) { toast((err && err.message) || "Could not bin it"); });
+        var kept = e;
+        inboxCache = inboxCache.filter(function (x) { return x.id !== id; });
+        render();
+
+        var t = $("#toast");
+        t.textContent = "";
+        t.appendChild(document.createTextNode("Binned"));
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = "Undo";
+        var gone = false;
+        b.onclick = function () {
+          gone = true;
+          clearTimeout(t._binH);
+          t.className = "";
+          inboxCache = (inboxCache || []).concat([kept]);
+          toast("Put back"); render();
+        };
+        t.appendChild(b);
+        t.className = "show act";
+
+        clearTimeout(t._binH);
+        t._binH = setTimeout(function () {
+          t.className = "";
+          if (gone) return;
+          FNWCEnquiry.remove(FNWCSync, id)["catch"](function () {
+            /* The server refused, so put it back rather than pretend. */
+            inboxCache = (inboxCache || []).concat([kept]);
+            toast("Could not bin it"); render();
+          });
+        }, 6000);
       };
     });
   }
@@ -1635,10 +1902,10 @@ if ("serviceWorker" in navigator) {
       card.querySelector("[data-snooze]").onclick = function () { snoozeSheet(c); };
 
       card.querySelector("[data-stop]").onclick = function () {
-        if (!confirm("Stop chasing " + c.name + " for rebooks?\n\nYou can turn it back on from their customer card.")) return;
-        if (commit(function (f) { FNWCFollowUps.stopRebook(f, cid, true); })) {
-          toast("Will not chase them again"); render();
-        }
+        doWithUndo("Will not chase " + FNWCFollowUps.firstName(c) + " again", function (f) {
+          FNWCFollowUps.stopRebook(f, cid, true);
+        });
+        render();
       };
     });
   }
@@ -2587,6 +2854,183 @@ if ("serviceWorker" in navigator) {
   }
 
   function vBooks(root) {
+    var tab = state.bt || "spend";
+    html(root, '<div class="seg" style="margin-bottom:12px">' +
+      '<button data-bt="spend" class="' + (tab === "spend" ? "on" : "") + '">Spending</button>' +
+      '<button data-bt="car" class="' + (tab === "car" ? "on" : "") + '">Car &amp; tax</button>' +
+      "</div>");
+    on("[data-bt]", function (e) { state.bt = e.dataset.bt; render(); }, root);
+    if (tab === "car") { vCar(root); return; }
+    vSpending(root);
+  }
+
+  /* ----------------------------------------------------------- CAR AND TAX
+     Every job already records the round-trip kilometres. Nothing has ever done
+     anything with them but estimate fuel, which means a year of travel records
+     was being thrown away twelve months at a time. For a sole trader the car
+     is usually the second biggest deduction there is.
+
+     This keeps the record. It does not give tax advice, and it deliberately
+     does not know the rates - they change every year and anything baked in
+     here would be wrong by the time it mattered.
+     --------------------------------------------------------------------- */
+
+  function vCar(root) {
+    var years = FNWCVehicle.yearsWithTrips(db);
+    var fy = state.cfy != null ? state.cfy : years[0];
+    var y = FNWCVehicle.year(db, fy);
+    var cpk = FNWCVehicle.centsPerKmClaim(db, fy);
+
+    html(root, '<div class="seg" style="margin-bottom:12px">' +
+      years.map(function (v) {
+        return '<button data-cfy="' + v + '" class="' + (v === fy ? "on" : "") + '">FY ' +
+          v + "/" + String(v + 1).slice(2) + "</button>";
+      }).join("") + "</div>");
+
+    html(root, '<div class="grid3" style="margin-bottom:12px">' +
+      '<div class="stat"><b>' + y.km + "</b><span>business km</span></div>" +
+      '<div class="stat"><b>' + y.tripCount + "</b><span>trips</span></div>" +
+      '<div class="stat"><b class="money">' +
+        (cpk.amount != null ? money(cpk.amount) : "—") + "</b><span>cents/km claim</span></div>" +
+      "</div>");
+
+    var CONF = { none: ["nothing logged", "bad"], poor: ["mostly estimated", "bad"],
+                 fair: ["some estimated", "warn"], good: ["well recorded", "good"] };
+    var c = CONF[y.confidence];
+    html(root, '<div class="card" style="padding:10px 12px;margin-bottom:12px">' +
+      '<div class="rowx"><span class="tiny">' + y.recordedCount + " of " + y.tripCount +
+      ' trips have real kilometres on them</span><span class="tag ' + c[1] +
+      '" style="margin-left:auto">' + c[0] + "</span></div>" +
+      (y.estimatedCount ? '<div class="tiny" style="margin-top:6px">' + y.estimatedCount +
+        " were worked out from the driving time because no km was entered (" + y.estimatedKm +
+        " km). Enter km on a job and it stops being a guess.</div>" : "") + "</div>");
+
+    if (cpk.needsRate) {
+      html(root, '<div class="card" style="border-color:var(--warn)">' +
+        "<h3>Put this year's rate in</h3>" +
+        '<div class="sub mt">The Tax Office sets a cents-per-kilometre rate each year and I will not ' +
+        "guess it — a wrong rate quietly producing a confident number is worse than a blank. " +
+        "Look up the current rate and enter it below.</div></div>");
+    }
+
+    html(root, '<div class="card"><h3>Cents per kilometre</h3>' +
+      '<div class="sub" style="margin-bottom:10px">Simplest method. Capped at ' + cpk.cap +
+      " km a year, no logbook needed, but you must be able to show how you got the number — " +
+      "which is what the download below is for.</div>" +
+      '<div class="grid2">' +
+        field("Rate (cents per km)", "car_rate", "number", null,
+          db.settings.centsPerKm || "", ' inputmode="decimal" placeholder="e.g. 88"') +
+        field("Cap (km per year)", "car_cap", "number", null,
+          db.settings.centsPerKmCap == null ? 5000 : db.settings.centsPerKmCap, ' inputmode="numeric"') +
+      "</div>" +
+      '<button class="btn p full" id="carSaveRate">Save</button>' +
+      '<hr class="sep">' +
+      '<div class="q-line"><span>Business km this year</span><b>' + y.km + "</b></div>" +
+      '<div class="q-line"><span>Claimable</span><b>' + cpk.claimableKm + " km</b></div>" +
+      (cpk.overCap ? '<div class="tiny" style="color:var(--warn)">You are ' + cpk.kmOverCap +
+        " km over the cap. The logbook method would very likely be worth more.</div>" : "") +
+      (cpk.amount != null
+        ? '<div class="q-total money">' + money(cpk.amount) + "</div>" : "") +
+      "</div>");
+
+    /* The logbook method. Twelve straight weeks, and the app can pick the best
+       stretch because "representative" is the test, not "lowest". */
+    var best = FNWCVehicle.bestPeriod(db, fy);
+    html(root, '<div class="card"><h3>Logbook method</h3>' +
+      '<div class="sub" style="margin-bottom:10px">Twelve straight weeks gives a business-use ' +
+      "percentage that then applies to everything the car costs, and stands for five years. " +
+      "More work, usually worth more. It cannot be done after the fact without records.</div>" +
+      (best
+        ? '<div class="q-line"><span>Best twelve weeks</span><b class="tiny">' +
+            esc(plainDate(best.from)) + " to " + esc(plainDate(best.to)) + "</b></div>" +
+          '<div class="q-line"><span>Business km in that stretch</span><b>' + best.businessKm + "</b></div>" +
+          '<div class="q-line"><span>Days you worked</span><b>' + best.days + "</b></div>" +
+          '<div class="mt">' +
+            field("Total km the car did in those weeks", "car_total", "number", null,
+              db.settings.logbookTotalKm || "", ' inputmode="numeric" placeholder="off the odometer"') +
+          "</div>" +
+          '<div id="car_pct" class="tiny" style="margin-bottom:10px"></div>' +
+          '<div class="grid2">' +
+            field("Car costs for the year $", "car_costs", "number", null,
+              db.settings.carRunningCosts || "", ' inputmode="decimal" placeholder="fuel, rego, insurance, servicing"') +
+            field("Business use %", "car_pctIn", "number", null,
+              db.settings.businessUsePct || "", ' inputmode="decimal"') +
+          "</div>" +
+          '<button class="btn p full" id="carSaveLog">Save</button>'
+        : '<div class="tiny">No trips recorded yet, so there is no stretch to suggest.</div>') +
+      "</div>");
+
+    var cmp = FNWCVehicle.compare(db, fy, {
+      runningCosts: db.settings.carRunningCosts,
+      businessUsePct: db.settings.businessUsePct
+    });
+    if (cmp.better) {
+      html(root, '<div class="card" style="border-color:var(--good)">' +
+        "<h3>The " + (cmp.better === "logbook" ? "logbook" : "cents per km") + " method looks better</h3>" +
+        '<div class="q-line"><span>Cents per km</span><b class="money">' + money(cmp.centsPerKm.amount) + "</b></div>" +
+        '<div class="q-line"><span>Logbook</span><b class="money">' + money(cmp.logbook.amount) + "</b></div>" +
+        '<div class="sub mt">A difference of <b>' + money(cmp.difference) + "</b>. Worth showing your " +
+        "accountant both numbers rather than taking mine for it.</div></div>");
+    }
+
+    html(root, '<div class="card"><h3>For the accountant</h3>' +
+      '<div class="sub" style="margin-bottom:10px">Every trip, with the date, where it was and how far. ' +
+      "It says which figures were recorded and which were worked out, because they should not be " +
+      "treated the same.</div>" +
+      '<button class="btn full" id="carCsv">Download the logbook</button></div>');
+
+    html(root, '<div class="tiny" style="text-align:center;padding:8px 0 20px">' +
+      "Record keeping, not tax advice. What is actually claimable is between you and your " +
+      "accountant.</div>");
+
+    on("[data-cfy]", function (e) { state.cfy = parseInt(e.dataset.cfy, 10); render(); }, root);
+
+    document.getElementById("carSaveRate").onclick = function () {
+      if (commit(function (f) {
+        f.settings = f.settings || {};
+        f.settings.centsPerKm = num("car_rate");
+        f.settings.centsPerKmCap = int("car_cap") || 5000;
+      })) { toast("Saved"); render(); }
+    };
+
+    var totalIn = document.getElementById("car_total");
+    if (totalIn && best) {
+      var paint = function () {
+        var u = FNWCVehicle.businessUse(best, totalIn.value);
+        var note = document.getElementById("car_pct");
+        note.textContent = u
+          ? "That is " + u.pct + "% business (" + u.businessKm + " of " + u.totalKm + " km, " +
+            u.privateKm + " private)."
+          : "Enter what the odometer says the car did over those weeks and it works out the percentage.";
+        note.style.color = u ? "var(--good)" : "var(--dim)";
+      };
+      totalIn.addEventListener("input", paint);
+      paint();
+
+      document.getElementById("carSaveLog").onclick = function () {
+        var u = FNWCVehicle.businessUse(best, val("car_total"));
+        if (commit(function (f) {
+          f.settings = f.settings || {};
+          f.settings.logbookTotalKm = num("car_total");
+          f.settings.carRunningCosts = num("car_costs");
+          f.settings.businessUsePct = num("car_pctIn") || (u ? u.pct : 0);
+        })) { toast("Saved"); render(); }
+      };
+    }
+
+    document.getElementById("carCsv").onclick = function () {
+      var text = FNWCVehicle.csv(y.trips);
+      var blob = new Blob([text], { type: "text/csv" });
+      var a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "fnwc-logbook-" + y.label.replace("/", "-") + ".csv";
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+      toast("Downloaded");
+    };
+  }
+
+  function vSpending(root) {
     var fy = state.fy != null ? state.fy : fyOf(todayISO());
     var years = {};
     db.expenses.forEach(function (e) { var y = fyOf(e.date); if (y != null) years[y] = 1; });
@@ -2672,10 +3116,11 @@ if ("serviceWorker" in navigator) {
     openSheet("Expense", h, [
       { label: "Edit", on: function () { closeSheet(); editExpense(e); } },
       { label: "Delete", cls: "d", on: function () {
-          if (!confirm("Delete this expense?")) return;
-          if (commit(function (f) { f.expenses = f.expenses.filter(function (x) { return x.id !== id; }); })) {
-            closeSheet(); toast("Deleted"); render();
-          }
+          closeSheet();
+          doWithUndo("Expense deleted", function (f) {
+            f.expenses = f.expenses.filter(function (x) { return x.id !== id; });
+          });
+          render();
         } }
     ]);
   }
@@ -2774,6 +3219,111 @@ if ("serviceWorker" in navigator) {
       };
       fr.readAsDataURL(file);
     };
+  }
+
+  /* ---------- bringing a customer list in --------------------------------
+     Two steps on purpose. Paste, see exactly what it is going to do, then
+     apply. Import is the one thing in here that can quietly wreck the data -
+     duplicate everyone, or blank details that were already right - so it never
+     happens on one tap.
+     --------------------------------------------------------------------- */
+
+  function importSheet() {
+    var h = '<div class="sub">Paste from a spreadsheet, a CSV, or just type one per line. ' +
+      "Headings help but are not needed — it can work most of it out from the data.</div>" +
+      '<label class="f" style="margin-top:10px"><span>Your list</span>' +
+      '<textarea class="in" id="im_text" style="min-height:150px" placeholder="Sarah Wilkins, 0412 345 678, Trinity Beach, 3&#10;Dave Toomey, 0400 111 222, Redlynch, 6"></textarea></label>' +
+      '<div class="tiny">Name, phone, suburb, how often in months, notes — in any order.</div>';
+
+    openSheet("Bring customers in", h, [
+      { label: "Cancel", on: closeSheet },
+      { label: "Have a look", cls: "p", on: function () {
+          var text = val("im_text");
+          if (!text) { toast("Paste the list in first"); return; }
+          var parsed = FNWCImport.parse(text);
+          if (!parsed.rows.length) { toast("Could not find anybody in that"); return; }
+          importPlanSheet(parsed);
+        } }
+    ]);
+    setTimeout(function () { document.getElementById("im_text").focus(); }, 60);
+  }
+
+  function importPlanSheet(parsed) {
+    load();
+    var plan = FNWCImport.plan(db, parsed.rows);
+    var skipped = {};
+    var FIELD_LABEL = { name: "Name", phone: "Phone", email: "Email",
+                        suburb: "Suburb", freqMonths: "Every (months)", notes: "Notes" };
+
+    var cols = Object.keys(parsed.map).map(function (i) { return FIELD_LABEL[parsed.map[i]]; });
+
+    var h = '<div class="wrap" style="margin-bottom:10px">' +
+      '<span class="tag good">' + plan.add.length + " new</span>" +
+      '<span class="tag info">' + plan.update.length + " to update</span>" +
+      '<span class="tag">' + plan.skip.length + " skipped</span>" + "</div>" +
+      '<div class="tiny" style="margin-bottom:12px">Read as: ' + esc(cols.join(", ")) +
+      (parsed.hadHeader ? " (from your headings)." : " (worked out from the data).") +
+      " Tap anyone you do not want.</div>";
+
+    if (plan.add.length) {
+      h += "<h4 style=\"margin:10px 0 6px\">New</h4>" +
+        plan.add.map(function (a, i) {
+          var c = a.customer;
+          return '<div class="q-line" data-pick="add:' + i + '"><span>' + esc(c.name) +
+            '<br><span class="tiny">' + esc([c.phone, c.suburb, c.freqMonths ? "every " + c.freqMonths + "m" : ""]
+              .filter(Boolean).join(" · ")) + "</span></span>" +
+            '<b class="tag good" data-tick>add</b></div>';
+        }).join("");
+    }
+
+    if (plan.update.length) {
+      h += "<h4 style=\"margin:14px 0 6px\">Already on file</h4>" +
+        plan.update.map(function (u, i) {
+          var fields = Object.keys(u.changes).map(function (k) { return FIELD_LABEL[k]; }).join(", ");
+          return '<div class="q-line" data-pick="update:' + i + '"><span>' + esc(u.existing.name) +
+            '<br><span class="tiny">adds ' + esc(fields.toLowerCase()) +
+            (u.unsure ? " · matched on name and suburb only" : " · matched on " + esc(u.matchedOn)) +
+            "</span></span>" +
+            '<b class="tag ' + (u.unsure ? "warn" : "info") + '" data-tick>update</b></div>';
+        }).join("");
+    }
+
+    if (plan.skip.length) {
+      h += "<h4 style=\"margin:14px 0 6px\">Skipped</h4>" +
+        plan.skip.map(function (s) {
+          return '<div class="q-line"><span>' + esc(s.customer.name || s.customer.phone || "(blank)") +
+            "</span><b class=\"tiny\">" + esc(s.why) + "</b></div>";
+        }).join("");
+    }
+
+    openSheet("What this will do", h, [
+      { label: "Back", on: function () { closeSheet(); importSheet(); } },
+      { label: "Import", cls: "p", on: function () {
+          var adds = plan.add.filter(function (a, i) { return !skipped["add:" + i]; });
+          var ups = plan.update.filter(function (u, i) { return !skipped["update:" + i]; });
+          if (!adds.length && !ups.length) { toast("Nothing left to import"); return; }
+
+          /* Applied once, inside commit, so it lands on a freshly read store
+             and a sync arriving mid-import is not trampled. */
+          var res = null;
+          if (!commit(function (f) {
+            res = FNWCImport.apply(f, { add: adds, update: ups }, uid);
+          })) return;
+
+          closeSheet();
+          toast(res.added + " added, " + res.updated + " updated");
+          go("customers");
+        } }
+    ]);
+
+    /* Tapping a row drops it from the import. */
+    on("[data-pick]", function (row) {
+      var key = row.dataset.pick;
+      skipped[key] = !skipped[key];
+      row.style.opacity = skipped[key] ? ".4" : "1";
+      var tick = row.querySelector("[data-tick]");
+      if (tick) tick.textContent = skipped[key] ? "no" : (key.indexOf("add") === 0 ? "add" : "update");
+    }, $("#sheetBody"));
   }
 
   /* ------------------------------------------------------------- SETTINGS */
@@ -2878,6 +3428,12 @@ if ("serviceWorker" in navigator) {
       "</div>" +
       '<button class="btn p full" id="sSavePay">Save</button></div>');
 
+    html(root, '<div class="card"><h3>Bring your customers in</h3>' +
+      '<div class="sub" style="margin-bottom:10px">Paste a list and it works out which column is ' +
+      "which. Anyone already on file is updated rather than added twice, and nothing is written " +
+      "until you have seen what it plans to do.</div>" +
+      '<button class="btn p full" id="sImport">Paste a customer list</button></div>');
+
     html(root, '<div class="card"><h3>Backup</h3>' +
       '<div class="sub" style="margin-bottom:10px">A copy of everything, as a file. Worth doing before a big change even with sync on.</div>' +
       '<button class="btn full" id="sExport">Download a backup</button></div>');
@@ -2938,6 +3494,8 @@ if ("serviceWorker" in navigator) {
 
     on("[data-place]", function (e) { placeSheet(e.dataset.place); }, root);
 
+    document.getElementById("sImport").onclick = function () { importSheet(); };
+
     document.getElementById("sSavePay").onclick = function () {
       if (commit(function (f) {
         f.settings = f.settings || {};
@@ -2981,6 +3539,92 @@ if ("serviceWorker" in navigator) {
   /* =========================================================================
      BOOT
      ====================================================================== */
+
+  /* ---------- search -----------------------------------------------------
+     One box across the lot. Customers had their own search and nothing else
+     did, so finding a job by the customer's name meant knowing which screen to
+     be on first - which is exactly the thing you have forgotten when you are
+     standing on someone's doorstep.
+     --------------------------------------------------------------------- */
+
+  function searchAll(q) {
+    q = String(q || "").toLowerCase().trim();
+    if (q.length < 2) return [];
+    var hits = [];
+    var has = function (s) { return String(s == null ? "" : s).toLowerCase().indexOf(q) !== -1; };
+
+    db.customers.forEach(function (c) {
+      if (has(c.name) || has(c.suburb) || has(c.phone) || has(c.email) || has(c.notes)) {
+        hits.push({ kind: "Customer", title: c.name,
+                    sub: [c.suburb, c.phone].filter(Boolean).join(" · "),
+                    go: function () { closeSearch(); go("customers"); custSheet(c.id); } });
+      }
+    });
+
+    db.jobs.forEach(function (j) {
+      var c = custOf(j.customerId);
+      if (has(c ? c.name : "") || has(j.suburb) || has(j.services) || has(j.invoiceNo)) {
+        hits.push({ kind: "Job", title: (c ? c.name : "(unknown)") + " · " + money(j.price),
+                    sub: [niceDate(j.date), j.suburb, j.invoiceNo].filter(Boolean).join(" · "),
+                    go: function () { closeSearch(); go("jobs"); jobSheet(j.id); } });
+      }
+    });
+
+    db.leads.forEach(function (l) {
+      if (has(l.name) || has(l.suburb) || has(l.phone) || has(l.notes)) {
+        hits.push({ kind: "Lead", title: l.name,
+                    sub: [l.suburb, STAGE_LABEL[l.stage]].filter(Boolean).join(" · "),
+                    go: function () { closeSearch(); go("leads"); leadSheet(l.id); } });
+      }
+    });
+
+    (db.expenses || []).forEach(function (e) {
+      if (has(e.desc) || has(e.supplier) || has(e.category) || has(e.note)) {
+        hits.push({ kind: "Expense", title: e.desc + " · " + money2(e.amount),
+                    sub: [niceDate(e.date), e.category].filter(Boolean).join(" · "),
+                    go: function () { closeSearch(); go("books"); expSheet(e.id); } });
+      }
+    });
+
+    return hits.slice(0, 40);
+  }
+
+  function drawSearch() {
+    var q = document.getElementById("searchIn").value;
+    var box = document.getElementById("searchRes");
+    var hits = searchAll(q);
+
+    if (q.trim().length < 2) { box.innerHTML = ""; return; }
+    if (!hits.length) {
+      box.innerHTML = '<div class="tiny" style="padding:10px 2px">Nothing matches that.</div>';
+      return;
+    }
+
+    var last = "";
+    box.innerHTML = hits.map(function (h, i) {
+      var head = h.kind !== last ? '<div class="kind">' + h.kind + "</div>" : "";
+      last = h.kind;
+      return head + '<div class="item" data-hit="' + i + '"><div class="t">' + esc(h.title) + "</div>" +
+        (h.sub ? '<div class="m">' + esc(h.sub) + "</div>" : "") + "</div>";
+    }).join("");
+
+    on("[data-hit]", function (e) { hits[parseInt(e.dataset.hit, 10)].go(); }, box);
+  }
+
+  function openSearch() {
+    document.body.classList.add("searching");
+    var i = document.getElementById("searchIn");
+    i.value = ""; document.getElementById("searchRes").innerHTML = "";
+    setTimeout(function () { i.focus(); }, 40);
+  }
+  function closeSearch() { document.body.classList.remove("searching"); }
+
+  $("#searchBtn").onclick = function () {
+    if (document.body.classList.contains("searching")) closeSearch();
+    else openSearch();
+  };
+  $("#searchIn").addEventListener("input", drawSearch);
+  $("#searchIn").addEventListener("keydown", function (e) { if (e.key === "Escape") closeSearch(); });
 
   $("#burger").onclick = function () { document.body.classList.toggle("nav"); };
   $("#scrim").onclick = function () { document.body.classList.remove("nav"); };
