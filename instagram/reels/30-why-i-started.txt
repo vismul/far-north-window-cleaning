@@ -1,0 +1,9 @@
+My first job took me {{hours}} hours. Now it's 1.
+{{Where you were before this}}.
+{{What made you pick up a pole}}.
+The first house I ever did was {{suburb}}, and I charged {{amount}}, and it took me {{hours}} hours because I had no idea what I was doing yet.
+Now it's a quarter of that time.
+Same suburbs.
+Cairns to Port Douglas.
+Comment HELLO if you're local.
+That's why. First house to now.
