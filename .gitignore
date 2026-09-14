@@ -1,3 +1,6 @@
 # nothing from the parent folder belongs in the published site
 *.xlsx
 *.json
+
+# the Instagram skills ship JSON data files that must be tracked
+!.claude/skills/**/*.json
