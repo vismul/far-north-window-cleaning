@@ -1,0 +1,9 @@
+Don't spend $6,000 on a van. I spent {{amount}}.
+The squeegee was {{p1}}.
+Bucket and scrim, {{p2}}.
+The water-fed pole was the big one, and I put off buying it for weeks because it felt like real money for someone who had done {{jobs}} jobs.
+It paid for itself in {{n}} jobs.
+Two storey went from a no to a yes, $150 to $250.
+That's the whole list, {{amount}}.
+Comment GEAR for the exact kit.
+{{amount}} of gear. That's the setup.

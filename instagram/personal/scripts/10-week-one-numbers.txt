@@ -1,0 +1,9 @@
+I'll show you my real numbers every week until 1k.
+{{jobs}} jobs.
+{{hours}} hours.
+Fuel took {{fuel}}, gear took {{gear}}, and what actually landed in my account was {{net}}, which works out at {{rate}} an hour for an 18 year old with no experience.
+That's not a flex.
+It's week 1.
+I'll post week 2 the same way.
+Follow if you want the real numbers.
+Week 1, {{amount}}, all of it.

@@ -1,0 +1,9 @@
+At 18 you get told 2 options. There's a 3rd.
+Nobody at 18 gets told there's a third option.
+It's uni or it's a trade.
+Nobody says you can start something on a Saturday with {{amount}} and have paying customers by the end of the month, because that option doesn't come with a brochure.
+They'll finish with a degree.
+I'll finish with {{n}} regulars.
+Ask me in 3 years.
+Comment THIRD if nobody told you either.
+They took option 2. I took the 3rd.
