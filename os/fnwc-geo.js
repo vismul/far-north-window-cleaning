@@ -301,7 +301,15 @@
 
   /* Everything about one day: the order to do it in, what the driving costs,
      and whether the day as booked is silly. */
-  function planDay(db, dateISO) {
+  /* Jobs booked for a time cannot be shuffled past each other, however much
+     driving it would save - a customer promised a morning is not going to be
+     pleased to be reordered into the afternoon. `groupOf` returns a sort key
+     per job; jobs sharing one may be reordered freely between themselves, and
+     the groups themselves stay in order. Without it the whole day is one
+     group, which is how this behaved before jobs had times. */
+  function planDay(db, dateISO, opts) {
+    opts = opts || {};
+    var groupOf = typeof opts.groupOf === "function" ? opts.groupOf : null;
     var jobs = jobsOn(db, dateISO);
     var base = basePoint(db);
     var placed = [], unplaced = [];
@@ -313,7 +321,32 @@
     });
 
     var pts = placed.map(function (x) { return x.point; });
-    var order = orderStops(pts, base);
+
+    var order;
+    if (groupOf && placed.length) {
+      /* Order within each time block, starting each block from where the last
+         one finished, and keep the blocks themselves in order. */
+      var keys = [];
+      placed.forEach(function (x) {
+        var k = groupOf(x.job);
+        if (keys.indexOf(k) === -1) keys.push(k);
+      });
+      keys.sort(function (a, b) { return a - b; });
+
+      order = [];
+      var from = base;
+      keys.forEach(function (k) {
+        var idx = [];
+        placed.forEach(function (x, i) { if (groupOf(x.job) === k) idx.push(i); });
+        var sub = idx.map(function (i) { return pts[i]; });
+        var subOrder = orderStops(sub, from);
+        subOrder.forEach(function (n) { order.push(idx[n]); });
+        from = pts[idx[subOrder[subOrder.length - 1]]];
+      });
+    } else {
+      order = orderStops(pts, base);
+    }
+
     var best = placed.length ? legKm(pts, order, base) : 0;
     var asBooked = placed.length ? legKm(pts, pts.map(function (_, i) { return i; }), base) : 0;
 
