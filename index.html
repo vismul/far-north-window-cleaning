@@ -627,11 +627,53 @@
   .pop p { font-size: 15.5px; color: var(--ink-2); margin: 0 auto 18px; }
   .pop .btn { width: 100%; }
   .pop .x {
-    position: absolute; top: 8px; right: 8px; width: 40px; height: 40px;
+    position: absolute; top: 8px; right: 8px; width: 44px; height: 44px;
     border: 0; background: transparent; color: var(--ink-3);
-    font-size: 22px; line-height: 1; cursor: pointer; border-radius: 50%;
+    font-size: 24px; line-height: 1; cursor: pointer; border-radius: 50%;
   }
   .pop .x:hover { background: var(--paper); color: var(--ink); }
+
+  /* The version that carries the whole form. Taller, scrolls inside itself,
+     and the close button stays pinned at the top so it is never more than one
+     tap away however far down the form they are. */
+  .pop-form {
+    max-width: 560px; text-align: left; padding: 0;
+    max-height: 92vh; display: flex; flex-direction: column; overflow: hidden;
+  }
+  .pop-head {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 20px 20px 14px; border-bottom: 1px solid var(--line-lt);
+    flex: none; background: var(--paper-2);
+  }
+  .pop-head h3 { font-size: 21px; margin: 0 0 4px; }
+  .pop-head p { font-size: 14.5px; margin: 0; }
+  .pop-head .x { position: static; flex: none; margin-left: auto; }
+  .pop-body {
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 0 20px 20px; flex: 1 1 auto;
+  }
+  /* Inside the sheet the card is already the sheet, so it drops its own
+     frame rather than drawing a box inside a box. */
+  .pop-body .qform {
+    margin: 0; border: 0; box-shadow: none; background: transparent;
+    padding: 18px 0 0; max-width: none;
+  }
+  .pop-body .qform.rise { opacity: 1; transform: none; }
+  body.pop-open { overflow: hidden; }
+
+  @media (max-width: 620px) {
+    /* A bottom sheet on a phone: it comes up from where the thumb already is,
+       and the page behind stays put. */
+    .pop-bg { padding: 0; align-items: flex-end; }
+    .pop-form {
+      max-width: none; max-height: 90vh;
+      border-radius: 18px 18px 0 0;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    .pop-head { padding: 16px 16px 12px; }
+    .pop-head h3 { font-size: 19px; }
+    .pop-body { padding: 0 16px 16px; }
+  }
 
   @media (max-width: 620px) {
     .qform { padding: 20px 16px; }
@@ -1311,12 +1353,20 @@
 
 <!-- Shown once per visit, after they have had time to read, or on the way out.
      Never on load, and never twice. -->
+<!-- The real quote form is moved in here when this opens, rather than a second
+     copy of it living on the page. One form, one set of fields, one set of
+     handlers - a duplicate would double-count every event and drift the moment
+     either copy changed. -->
 <div class="pop-bg" id="popBg" role="dialog" aria-modal="true" aria-labelledby="popH" hidden>
-  <div class="pop">
-    <button class="x" id="popX" aria-label="Close">&times;</button>
-    <h3 id="popH">Need your windows cleaned?</h3>
-    <p>Get a free quote from Far North Window Cleaning.</p>
-    <a class="btn btn-primary btn-big" href="#quote" id="popGo" data-track="cta" data-cta="popup">GET A FREE QUOTE</a>
+  <div class="pop pop-form">
+    <div class="pop-head">
+      <div>
+        <h3 id="popH">Need your windows cleaned?</h3>
+        <p>Get a free quote from Far North Window Cleaning.</p>
+      </div>
+      <button class="x" id="popX" aria-label="Close">&times;</button>
+    </div>
+    <div class="pop-body" id="popBody"></div>
   </div>
 </div>
 
@@ -1750,18 +1800,33 @@
   })();
 
   /* ---- the quote prompt ----------------------------------------------------
-     Once per visit, never on load, and never while they are already looking at
-     the form. On a phone there is no exit intent to detect, so it waits until
-     they have read a fair way down instead.
+     Brings the quote form up by itself a few seconds in, so somebody who
+     arrived off an ad is asked rather than left to find it.
+
+     It is the real form, moved into the sheet and moved back when it closes -
+     not a second copy. Two copies would double-count every event, and the
+     moment either one changed they would quietly disagree.
+
+     Shown once per visit, never while they are already looking at the form,
+     and never after they have sent one. Backdrop, Escape and the close button
+     all shut it.
      ------------------------------------------------------------------------ */
   (function () {
+    /* How long to wait before asking. Change this one number. */
+    var AFTER_SECONDS = 7;
+
     var bg = document.getElementById("popBg");
-    if (!bg) return;
+    var body = document.getElementById("popBody");
+    var card = document.getElementById("qformCard");
+    if (!bg || !body || !card) return;
 
     var KEY = "fnwc-pop";
     function seen() { try { return !!sessionStorage.getItem(KEY); } catch (e) { return false; } }
     function mark() { try { sessionStorage.setItem(KEY, "1"); } catch (e) {} }
-    if (seen()) return;
+
+    /* Where the form lives on the page, so it can go back. */
+    var home = document.createComment("quote form sits here");
+    card.parentNode.insertBefore(home, card);
 
     var quote = document.getElementById("quote");
     function lookingAtForm() {
@@ -1770,36 +1835,65 @@
       return r.top < window.innerHeight && r.bottom > 0;
     }
 
-    var shown = false;
-    function show() {
-      if (shown || seen() || lookingAtForm()) return;
-      shown = true; mark();
+    var open = false;
+    var lastFocus = null;
+
+    function show(why) {
+      if (open || seen() || lookingAtForm()) return;
+      /* Nothing to ask somebody who has already sent one. */
+      if (document.getElementById("q_done") && !document.getElementById("q_done").hidden) return;
+
+      open = true; mark();
+      lastFocus = document.activeElement;
+      body.appendChild(card);
       bg.hidden = false;
       bg.classList.add("on");
+      document.body.classList.add("pop-open");
       document.getElementById("popX").focus();
+      EV.send("QuotePopupShown", { why: why || "" });
     }
+
     function hide() {
+      if (!open) return;
+      open = false;
       bg.classList.remove("on");
       bg.hidden = true;
+      document.body.classList.remove("pop-open");
+      /* Put the form back where it came from, so the page below still works. */
+      home.parentNode.insertBefore(card, home);
+      try { if (lastFocus && lastFocus.focus) lastFocus.focus(); } catch (e) {}
     }
 
     document.getElementById("popX").addEventListener("click", hide);
-    document.getElementById("popGo").addEventListener("click", hide);
     bg.addEventListener("click", function (e) { if (e.target === bg) hide(); });
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !bg.hidden) hide(); });
-
-    /* On the way out of the window, on a desktop. */
-    document.addEventListener("mouseout", function (e) {
-      if (e.clientY <= 0 && !e.relatedTarget) show();
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && open) hide();
     });
 
-    /* Or once they have read a decent way down, on anything. */
-    var deep = false;
-    window.addEventListener("scroll", function () {
-      if (deep) return;
-      var h = document.documentElement.scrollHeight - window.innerHeight;
-      if (h > 0 && window.scrollY / h > 0.55) { deep = true; setTimeout(show, 1200); }
-    }, { passive: true });
+    /* Keep tabbing inside the sheet while it is open, rather than wandering
+       off into the page behind it. */
+    bg.addEventListener("keydown", function (e) {
+      if (e.key !== "Tab" || !open) return;
+      var f = bg.querySelectorAll('button, [href], input, select, textarea, summary');
+      var list = [].filter.call(f, function (el) {
+        return !el.disabled && el.offsetParent !== null;
+      });
+      if (!list.length) return;
+      var first = list[0], last = list[list.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    });
+
+    if (seen()) return;
+
+    /* The main way it opens: a few seconds after they land. */
+    setTimeout(function () { show("timer"); }, AFTER_SECONDS * 1000);
+
+    /* And on the way out of the window on a desktop, if the timer has not
+       already had its turn. */
+    document.addEventListener("mouseout", function (e) {
+      if (e.clientY <= 0 && !e.relatedTarget) show("exit");
+    });
   })();
 
 
