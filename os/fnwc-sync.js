@@ -523,17 +523,21 @@
       var theirs = remote ? remote.data : null;
 
       /* No record of what this device last agreed on - a first sync, or a
-         phone whose storage has been cleared out from under it.
+         device whose storage was cleared out from under it.
 
-         This must be what THIS device already holds, never what the server
-         holds. A deletion is "the base had it and I do not", so taking the
-         server as the base tells the merge that everything the server knows
-         and this device does not has just been deleted. A phone that came
-         back empty would then wipe the business off the server, which is
-         exactly what it once did. Taking our own state as the base can only
-         ever add; it can never delete something nobody asked to delete. */
+         A deletion is "the base had it and I do not". So with no base there is
+         no history to infer a deletion from, and the only safe base is an
+         empty one: every record on either side reads as an addition, and the
+         two sides are unioned.
+
+         Both of the obvious shortcuts are wrong, and each destroys data in its
+         own direction. Taking the server as the base makes a phone that came
+         back empty delete the whole business off the server. Taking this
+         device as the base makes restoring a backup onto a machine read the
+         empty server as somebody having deleted it all. An empty base is the
+         only value that cannot lose a record either way. */
       var base = readJSON(key + "__syncbase");
-      if (base === null) base = clone(mine);
+      if (base === null) base = {};
 
       if (mine === null && theirs === null) return false;
 
