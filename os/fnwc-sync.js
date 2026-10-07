@@ -522,10 +522,18 @@
     return getDoc(key).then(function (remote) {
       var theirs = remote ? remote.data : null;
 
-      /* First run on this device: treat the server as the shared starting
-         point, so the very first merge adds rather than deletes. */
+      /* No record of what this device last agreed on - a first sync, or a
+         phone whose storage has been cleared out from under it.
+
+         This must be what THIS device already holds, never what the server
+         holds. A deletion is "the base had it and I do not", so taking the
+         server as the base tells the merge that everything the server knows
+         and this device does not has just been deleted. A phone that came
+         back empty would then wipe the business off the server, which is
+         exactly what it once did. Taking our own state as the base can only
+         ever add; it can never delete something nobody asked to delete. */
       var base = readJSON(key + "__syncbase");
-      if (base === null) base = clone(theirs !== null ? theirs : mine);
+      if (base === null) base = clone(mine);
 
       if (mine === null && theirs === null) return false;
 
