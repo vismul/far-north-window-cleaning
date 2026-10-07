@@ -291,7 +291,7 @@ window.FNWC_SYNC_NO_PILL = true;   /* this app draws its own sync button */
 /* Bumped whenever this file changes, so Settings can tell you which build you
    are actually looking at. Worth having: "is it even the new version?" is
    otherwise impossible to answer from a phone. */
-window.FNWC_BUILD = "2026-09-29a";
+window.FNWC_BUILD = "2026-10-07a";
 
 /* An app on the home screen will otherwise sit on a copy of this page from
    days ago. The worker fetches fresh every time and keeps a copy only for
@@ -1784,12 +1784,25 @@ if ("serviceWorker" in navigator) {
         '<div class="sub" style="margin:4px 0 8px">' +
           [e.suburb, e.windows ? e.windows + " windows" : "", e.storeys ? e.storeys + " storey" : "", e.sides]
             .filter(Boolean).map(esc).join(" &middot; ") + "</div>" +
+        (e.services ? '<div class="wrap" style="margin-bottom:8px">' +
+          String(e.services).split(",").map(function (s) {
+            return '<span class="tag info">' + esc(s.trim()) + "</span>";
+          }).join("") + "</div>" : "") +
         (e.notes ? '<div class="tiny" style="margin-bottom:8px">' + esc(e.notes) + "</div>" : "") +
+        /* Photos they sent. Worth more than the window count for quoting. */
+        (e.photos ? '<div class="shots" style="margin-bottom:10px">' +
+          String(e.photos).split(/\s+/).filter(Boolean).slice(0, 6).map(function (u) {
+            return '<a class="shot" href="' + esc(u) + '" target="_blank" rel="noopener">' +
+              '<img src="' + esc(u) + '" alt="Photo from the customer" loading="lazy"></a>';
+          }).join("") + "</div>" : "") +
         '<div class="wrap" style="margin-bottom:10px">' +
           (e.phone ? '<a class="btn sm" href="tel:' + esc(tel(e.phone)) + '">' + esc(e.phone) + "</a>" : "") +
           (e.email ? '<a class="btn sm" href="mailto:' + esc(e.email) + '">Email</a>' : "") +
           (e.sentAt ? '<span class="tag">' + esc(niceDate(String(e.sentAt).slice(0, 10))) + "</span>" : "") +
         "</div>" +
+        /* Which ad or post sent them, so the spend can be judged. */
+        '<div class="tiny" style="margin-bottom:10px;color:var(--faint)">From ' +
+          esc(FNWCEnquiry.sourceLabel(e)) + "</div>" +
         '<div class="grid2">' +
           '<button class="btn p" data-accept>Add as a lead</button>' +
           '<button class="btn d" data-bin>Bin it</button>' +

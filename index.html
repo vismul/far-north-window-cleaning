@@ -508,6 +508,144 @@
   /* The honeypot. Off-screen rather than display:none, because some bots skip
      anything that is properly hidden. */
   .qhp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
+  /* ---------- quote form, mobile first -------------------------------------
+     Most of this traffic arrives on a phone from an ad, so everything here is
+     sized for a thumb: 48px minimum targets, 16px inputs so iOS does not zoom
+     on focus, and no animation that delays the form appearing.
+     ----------------------------------------------------------------------- */
+  .qf label .req { color: var(--sky-deep); }
+  /* 16px on every input in here, not just the visible ones. Anything under
+     16px makes iOS zoom the page in the moment the field is focused, and the
+     visitor then has to pinch back out to carry on. */
+  #quote input { font-size: 16px; }
+  .qf input { min-height: 50px; }
+  .qblock { margin-top: 18px; }
+  .qlab {
+    display: block; font-size: 14px; font-weight: 700; color: var(--ink);
+    margin-bottom: 9px;
+  }
+  .qhelp { font-size: 14px; color: var(--ink-2); margin: 0 0 10px; max-width: 54ch; }
+  .qpick { display: flex; flex-wrap: wrap; gap: 9px; }
+  .qpick button {
+    appearance: none; cursor: pointer; font-family: var(--body);
+    font-size: 15px; font-weight: 600; line-height: 1.2;
+    min-height: 48px; padding: 12px 16px;
+    border: 1.5px solid var(--line-lt); border-radius: 10px;
+    background: var(--paper-2); color: var(--ink);
+    transition: border-color .12s ease, background .12s ease, color .12s ease;
+  }
+  .qpick button:hover { border-color: var(--sky); }
+  .qpick button[aria-pressed="true"] {
+    background: var(--navy); border-color: var(--navy); color: var(--on-dark);
+  }
+  .btn-big { font-size: 17px; padding: 17px 28px; min-height: 56px; }
+  .qbtns .btn-big { flex: 1 1 260px; }
+  .qest {
+    margin: 18px 0 0; padding: 14px 16px; border-radius: 12px;
+    background: #E4F1F9; border: 1px solid var(--line-lt);
+    font-size: 15px; color: var(--ink);
+  }
+  .qest b { font-size: 17px; }
+
+  .qupload { min-height: 48px; }
+  .qshots { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .qshot {
+    position: relative; width: 78px; height: 78px; border-radius: 9px;
+    overflow: hidden; border: 1px solid var(--line-lt); background: #DCE9F2;
+  }
+  .qshot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .qshot .x {
+    position: absolute; top: 3px; right: 3px; width: 24px; height: 24px;
+    border: 0; border-radius: 50%; background: rgba(1,34,69,.78); color: #fff;
+    font-size: 15px; line-height: 1; cursor: pointer;
+  }
+  .qshot.busy::after {
+    content: ""; position: absolute; inset: 0; background: rgba(1,34,69,.42);
+  }
+
+  .qalt { margin-top: 16px; border-top: 1px solid var(--line-lt); padding-top: 12px; }
+  .qalt summary {
+    cursor: pointer; font-size: 14px; font-weight: 600; color: var(--ink-2);
+    list-style: none;
+  }
+  .qalt summary::-webkit-details-marker { display: none; }
+  .qalt summary::before { content: "+ "; color: var(--sky-deep); }
+  .qalt[open] summary::before { content: "\2212 "; }
+  .qaltin { padding-top: 12px; }
+  .qaltin p { font-size: 14px; color: var(--ink-2); }
+
+  /* confirmation */
+  .qdone { text-align: center; padding: 8px 0 4px; }
+  .qtick {
+    width: 62px; height: 62px; margin: 0 auto 18px; border-radius: 50%;
+    background: var(--palm); color: #fff; display: grid; place-items: center;
+  }
+  .qtick svg { width: 30px; height: 30px; }
+  .qdone h3 { font-size: 25px; margin-bottom: 10px; }
+  .qdone p { margin-inline: auto; }
+  .qdone .btn-row { justify-content: center; margin-top: 18px; }
+  .qsmall { font-size: 13px; color: var(--ink-3); margin-top: 16px; }
+
+  /* trust strip, sitting right under the form where the decision happens */
+  .trust {
+    list-style: none; margin: 26px 0 0; padding: 0;
+    display: flex; flex-wrap: wrap; gap: 10px 26px; justify-content: center;
+  }
+  .trust li {
+    font-size: 14.5px; font-weight: 600; color: var(--ink-2);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .trust li::before {
+    content: ""; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--palm); flex: none;
+  }
+
+  /* ---------- sticky call-to-action on phones ---------- */
+  .sticky-cta {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 70;
+    display: none; gap: 10px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(0,18,31,.95); backdrop-filter: blur(10px);
+    border-top: 1px solid var(--rule-dk);
+  }
+  .sticky-cta .btn { flex: 1; min-height: 52px; font-size: 16px; }
+  body.show-cta .sticky-cta { display: flex; }
+  @media (min-width: 821px) { body.show-cta .sticky-cta { display: none; } }
+
+  /* ---------- the delayed / exit-intent quote prompt ---------- */
+  .pop-bg {
+    position: fixed; inset: 0; z-index: 90; background: rgba(0,18,31,.62);
+    display: none; align-items: center; justify-content: center; padding: 18px;
+  }
+  .pop-bg.on { display: flex; }
+  .pop {
+    background: var(--paper-2); border-radius: 16px; max-width: 420px; width: 100%;
+    padding: 26px 24px; text-align: center; position: relative;
+    box-shadow: 0 30px 70px -30px rgba(0,0,0,.6);
+  }
+  .pop h3 { font-size: 24px; margin-bottom: 8px; }
+  .pop p { font-size: 15.5px; color: var(--ink-2); margin: 0 auto 18px; }
+  .pop .btn { width: 100%; }
+  .pop .x {
+    position: absolute; top: 8px; right: 8px; width: 40px; height: 40px;
+    border: 0; background: transparent; color: var(--ink-3);
+    font-size: 22px; line-height: 1; cursor: pointer; border-radius: 50%;
+  }
+  .pop .x:hover { background: var(--paper); color: var(--ink); }
+
+  @media (max-width: 620px) {
+    .qform { padding: 20px 16px; }
+    .qgrid { grid-template-columns: 1fr; }
+    .qpick button { flex: 1 1 calc(50% - 5px); }
+    .qbtns .btn { width: 100%; }
+    .trust { gap: 8px 18px; }
+    .trust li { font-size: 13.5px; }
+    .qdone h3 { font-size: 21px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .qpick button, .btn { transition: none; }
+  }
   .qgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
   .qf.wide { grid-column: 1 / -1; }
   .qf label {
@@ -757,32 +895,26 @@
       <a href="#prices">Prices</a>
       <a href="#areas">Areas</a>
       <a href="#faq">Questions</a>
-      <a href="#quote">Get a price</a>
+      <a href="#quote">Get a quote</a>
     </div>
-    <a class="btn btn-primary" href="tel:+61478521431">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2Z"/>
-      </svg>
-      Call now
-    </a>
+    <a class="btn btn-primary" href="#quote" data-track="cta" data-cta="nav">Get a free quote</a>
   </div>
 </nav>
 
 <div class="hero on-dark" id="top">
   <div class="shell hero-in">
     <div>
-      <p class="eyebrow">Cairns &amp; the northern beaches</p>
-      <h1>You paid for the view. <em>Let's give it back.</em></h1>
+      <p class="eyebrow">Window cleaning &middot; Cairns &amp; the northern beaches</p>
+      <h1>Crystal clear windows. <em>Without the hassle.</em></h1>
       <p class="lede">
-        Streak-free window cleaning for homes across Far North Queensland.
-        Inside, outside, screens, tracks and sliding doors. Upstairs glass done
-        from the ground with a water-fed pole &mdash; no ladders leaning on your
-        gutters.
+        Professional window cleaning for homes across Cairns and surrounding
+        areas. Inside, outside, screens, tracks and sliding doors. Upstairs glass
+        done from the ground with a water-fed pole &mdash; no ladders leaning on
+        your gutters.
       </p>
       <div class="btn-row">
-        <a class="btn btn-primary" href="tel:+61478521431">Call 0478 521 431</a>
-        <a class="btn btn-ghost" href="mailto:farnorthwindowcleaning@outlook.com?subject=Window%20cleaning%20quote">Email for a quote</a>
+        <a class="btn btn-primary btn-big" href="#quote" data-track="cta" data-cta="hero">GET A FREE QUOTE</a>
+        <a class="btn btn-ghost" href="tel:+61478521431" data-track="call">CALL US</a>
       </div>
       <p class="hero-note">Free quotes &middot; Priced on the spot &middot; No call-out fee</p>
     </div>
@@ -1027,74 +1159,130 @@
 <section class="band light-2" id="quote">
   <div class="shell">
     <div class="head-wide rise">
-      <p class="eyebrow">Rather not ring?</p>
-      <h2>Send me the details and I'll price it</h2>
+      <p class="eyebrow">Free quote</p>
+      <h2>Get Your Free Quote</h2>
       <p class="lede">
-        Fill this in and it turns into a message you send from your own phone.
-        Takes about thirty seconds, and you will usually have a price back the
-        same day.
+        Tell us a few details about your windows and we'll get back to you with
+        a quote. Takes about thirty seconds.
       </p>
     </div>
 
-    <div class="qform rise">
-      <div class="qgrid">
-        <div class="qf">
-          <label for="q_name">Your name</label>
-          <input type="text" id="q_name" autocomplete="name" placeholder="Sarah Wilkins" />
+    <div class="qform rise" id="qformCard">
+
+      <!-- ===== the form ===== -->
+      <div id="q_formWrap">
+        <div class="qgrid">
+          <div class="qf">
+            <label for="q_name">Your name <span class="req">*</span></label>
+            <input type="text" id="q_name" autocomplete="name" enterkeyhint="next"
+                   placeholder="Sarah Wilkins" />
+          </div>
+          <div class="qf">
+            <label for="q_phone">Mobile number <span class="req">*</span></label>
+            <input type="tel" id="q_phone" autocomplete="tel" inputmode="tel" enterkeyhint="next"
+                   placeholder="0412 345 678" />
+          </div>
+          <div class="qf wide">
+            <label for="q_sub">Suburb <span class="req">*</span></label>
+            <input type="text" id="q_sub" autocomplete="address-level2" enterkeyhint="next"
+                   list="subList" placeholder="Trinity Beach" />
+            <datalist id="subList"></datalist>
+          </div>
         </div>
-        <div class="qf">
-          <label for="q_phone">Best number</label>
-          <input type="tel" id="q_phone" autocomplete="tel" placeholder="0412 345 678" />
+
+        <div class="qblock">
+          <span class="qlab">What would you like cleaned?</span>
+          <div class="qpick" id="q_services" role="group" aria-label="What would you like cleaned"></div>
         </div>
-        <div class="qf">
-          <label for="q_sub">Suburb</label>
-          <input type="text" id="q_sub" placeholder="Trinity Beach" />
+
+        <div class="qblock">
+          <span class="qlab">Roughly how many windows and sliding doors?</span>
+          <div class="qpick" id="q_band" role="group" aria-label="How many windows"></div>
         </div>
-        <div class="qf">
-          <label for="q_win">Roughly how many windows</label>
-          <input type="number" id="q_win" min="1" max="300" inputmode="numeric" placeholder="20" />
+
+        <div class="qblock">
+          <span class="qlab">Single or two storey?</span>
+          <div class="qpick" id="q_storeys" role="group" aria-label="Single or two storey"></div>
         </div>
-        <div class="qf">
-          <label for="q_storeys">Storeys</label>
-          <select id="q_storeys">
-            <option value="Single">Single storey</option>
-            <option value="Two">Two storey</option>
-          </select>
+
+        <p class="qest" id="q_est" hidden></p>
+
+        <div class="qgrid">
+          <div class="qf wide">
+            <label for="q_note">Anything else <span class="opt">(optional)</span></label>
+            <input type="text" id="q_note"
+                   placeholder="Screens and tracks too, and there is a dog in the yard" />
+          </div>
         </div>
-        <div class="qf">
-          <label for="q_sides">Inside as well?</label>
-          <select id="q_sides">
-            <option value="Outside only">Outside only</option>
-            <option value="Inside and out">Inside and out</option>
-          </select>
+
+        <!-- ===== photos: only shown if Firebase Storage is actually set up ===== -->
+        <div class="qblock" id="q_photoBlock" hidden>
+          <span class="qlab">Have photos? <span class="opt">(optional)</span></span>
+          <p class="qhelp">Upload a few here and we'll take a look &mdash; it means a
+             faster and more accurate quote, and saves you counting windows.</p>
+          <input type="file" id="q_photos" accept="image/*" multiple hidden />
+          <button type="button" class="btn btn-ghost-lt qupload" id="q_photoBtn">Add photos</button>
+          <div class="qshots" id="q_shots"></div>
         </div>
-        <div class="qf wide">
-          <label for="q_note">Anything else <span class="opt">(optional)</span></label>
-          <input type="text" id="q_note" placeholder="Screens and tracks too, and there is a dog in the yard" />
+
+        <!-- Hidden from people and from screen readers. Anything in it is a bot. -->
+        <div class="qhp" aria-hidden="true">
+          <label for="q_company">Company</label>
+          <input type="text" id="q_company" tabindex="-1" autocomplete="off" />
+        </div>
+
+        <div class="qbtns">
+          <button type="button" class="btn btn-primary btn-big" id="q_send">GET MY FREE QUOTE</button>
+          <a class="btn btn-ghost-lt" href="tel:+61478521431" data-track="call">Or call 0478 521 431</a>
+        </div>
+
+        <p class="qnote" id="q_msg">
+          No obligation and no call-out fee. We'll ring you back to talk it through.
+        </p>
+
+        <details class="qalt">
+          <summary>Rather not fill in a form?</summary>
+          <div class="qaltin">
+            <p>Send the same details as a text or an email instead.</p>
+            <div class="qbtns">
+              <button type="button" class="btn btn-ghost-lt" id="q_sms">Send as a text</button>
+              <button type="button" class="btn btn-ghost-lt" id="q_email">Send as an email</button>
+              <button type="button" class="btn btn-ghost-lt" id="q_copy">Copy the details</button>
+            </div>
+          </div>
+        </details>
+      </div>
+
+      <!-- ===== confirmation, swapped in after a successful send ===== -->
+      <div id="q_done" hidden>
+        <div class="qdone">
+          <div class="qtick" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                 stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          </div>
+          <h3>Thanks! We've received your quote request.</h3>
+          <p>
+            We'll be in touch shortly to discuss your job and organise your quote.
+            If it is easier, you are welcome to ring straight through.
+          </p>
+          <div class="btn-row">
+            <a class="btn btn-primary btn-big" href="tel:+61478521431" data-track="call">
+              CALL FAR NORTH WINDOW CLEANING
+            </a>
+          </div>
+          <p class="qsmall" id="q_doneDetail"></p>
         </div>
       </div>
 
-      <p class="qest" id="q_est"></p>
-
-      <!-- Bots fill in everything they can see. This one is hidden from
-           people and from screen readers, so anything in it came from a
-           machine. -->
-      <div class="qhp" aria-hidden="true">
-        <label for="q_company">Company</label>
-        <input type="text" id="q_company" tabindex="-1" autocomplete="off" />
-      </div>
-
-      <div class="qbtns">
-        <button type="button" class="btn btn-primary" id="q_send">Send it to Liam</button>
-        <button type="button" class="btn btn-ghost-lt" id="q_sms">Send as a text</button>
-        <button type="button" class="btn btn-ghost-lt" id="q_email">Send as an email</button>
-        <button type="button" class="btn btn-ghost-lt" id="q_copy">Copy the details</button>
-      </div>
-      <p class="qnote" id="q_msg">
-        Send it straight through and it lands on Liam's phone. If you would rather
-        not, the other buttons compose a text or an email for you to send yourself.
-      </p>
     </div>
+
+    <!-- genuine, already true of the business: nothing invented here -->
+    <ul class="trust rise" id="trustRow">
+      <li>Local Cairns business</li>
+      <li>Inside, outside, screens &amp; tracks</li>
+      <li>Upstairs done from the ground</li>
+      <li>Free quotes, no call-out fee</li>
+    </ul>
   </div>
 </section>
 
@@ -1106,11 +1294,29 @@
       Tell me roughly how many windows and where you are, and you will have a
       number on the spot. No obligation, no pressure, no call-out fee.
     </p>
-    <a class="big" href="tel:+61478521431">0478 521 431</a>
     <div class="btn-row">
-      <a class="btn btn-primary" href="tel:+61478521431">Call now</a>
-      <a class="btn btn-ghost" href="mailto:farnorthwindowcleaning@outlook.com?subject=Window%20cleaning%20quote">Email for a quote</a>
+      <a class="btn btn-primary btn-big" href="#quote" data-track="cta" data-cta="closer">GET A FREE QUOTE</a>
+      <a class="btn btn-ghost" href="tel:+61478521431" data-track="call">CALL US</a>
     </div>
+    <a class="big" href="tel:+61478521431" data-track="call">0478 521 431</a>
+  </div>
+</div>
+
+<!-- Sticky on phones only, and only once the hero has scrolled past, so it
+     never covers the first thing somebody sees. -->
+<div class="sticky-cta" id="stickyCta">
+  <a class="btn btn-primary" href="#quote" data-track="cta" data-cta="sticky">GET A FREE QUOTE</a>
+  <a class="btn btn-ghost" href="tel:+61478521431" data-track="call" aria-label="Call us">CALL</a>
+</div>
+
+<!-- Shown once per visit, after they have had time to read, or on the way out.
+     Never on load, and never twice. -->
+<div class="pop-bg" id="popBg" role="dialog" aria-modal="true" aria-labelledby="popH" hidden>
+  <div class="pop">
+    <button class="x" id="popX" aria-label="Close">&times;</button>
+    <h3 id="popH">Need your windows cleaned?</h3>
+    <p>Get a free quote from Far North Window Cleaning.</p>
+    <a class="btn btn-primary btn-big" href="#quote" id="popGo" data-track="cta" data-cta="popup">GET A FREE QUOTE</a>
   </div>
 </div>
 
@@ -1128,6 +1334,7 @@
 
 <script src="fnwc-firebase-config.js"></script>
 <script src="fnwc-enquiry.js"></script>
+<script src="fnwc-geo.js"></script>
 <script>
 (function () {
   "use strict";
@@ -1180,181 +1387,334 @@
     }
   }
 
-  /* ---- enquiry form -------------------------------------------------------
-     "Send it to Liam" posts straight into a quarantine collection he reviews
-     before anything becomes a lead, so nothing a stranger sends can land in
-     his books on its own.
+  /* ---- tracking ------------------------------------------------------------
+     One place that records what happened, so there is a single thing to point
+     a pixel at rather than three competing ones.
 
-     The text and email buttons remain, and are also the fallback when the send
-     fails - out of signal, blocked, or the site is not set up to send yet.
-     An enquiry must never be lost because a network call did not work.
+     No Meta Pixel is installed on this site. If one is added, `fbq` appears on
+     the page and the calls below start reaching it; until then they go nowhere
+     and nothing breaks. The same is true of Google's `gtag`. Nothing here
+     pretends an analytics account exists.
+     ------------------------------------------------------------------------ */
+  var EV = (function () {
+    var seen = {};
+    function send(name, params, opts) {
+      opts = opts || {};
+      if (opts.once) {
+        if (seen[name]) return;
+        seen[name] = 1;
+      }
+      try {
+        if (typeof window.fbq === "function") {
+          /* Lead is one of Meta's standard events; the rest are custom. */
+          if (name === "Lead") window.fbq("track", "Lead", params || {});
+          else window.fbq("trackCustom", name, params || {});
+        }
+      } catch (e) {}
+      try { if (typeof window.gtag === "function") window.gtag("event", name, params || {}); } catch (e) {}
+      try { (window.dataLayer = window.dataLayer || []).push(Object.assign({ event: name }, params || {})); } catch (e) {}
+    }
+    return { send: send };
+  })();
+
+  /* Remember the campaign for the session, the moment the page opens. */
+  try { if (window.FNWCEnquiry) window.FNWCEnquiry.captureTracking(window); } catch (e) {}
+
+  /* Every CTA and every tap on a phone number, recorded once each. */
+  document.addEventListener("click", function (e) {
+    var el = e.target.closest ? e.target.closest("[data-track]") : null;
+    if (!el) return;
+    var kind = el.getAttribute("data-track");
+    if (kind === "call") EV.send("CallClick", { place: el.getAttribute("data-cta") || "" });
+    else if (kind === "cta") EV.send("QuoteCtaClick", { place: el.getAttribute("data-cta") || "" });
+  }, true);
+
+  /* ---- quote form ----------------------------------------------------------
+     Submitting posts straight into the enquiries collection in Firestore, which
+     is the same pipe the inbox on Liam's phone reads. The text and email
+     buttons remain underneath as the fallback for a failed send - an enquiry
+     must never be lost because a network call did not work.
 
      The shape of an enquiry lives in fnwc-enquiry.js so this page, Window OS
-     and the phone cannot drift apart. */
+     and the phone cannot drift apart.
+     ------------------------------------------------------------------------ */
   (function () {
     var PHONE = "+61478521431";
     var EMAIL = "farnorthwindowcleaning@outlook.com";
     var EQ = window.FNWCEnquiry;
 
-    /* Liam's rate card, same numbers as the quote calculator. */
-    var RATE = {
-      minSingle: 150, minDouble: 250,
-      single: { out: 9,  both: 13 },
-      two:    { out: 12, both: 16 }
-    };
-
     var f = {
       name:  document.getElementById("q_name"),
       phone: document.getElementById("q_phone"),
       sub:   document.getElementById("q_sub"),
-      win:   document.getElementById("q_win"),
-      st:    document.getElementById("q_storeys"),
-      sides: document.getElementById("q_sides"),
       note:  document.getElementById("q_note")
     };
-    if (!f.name) return;
+    if (!f.name || !EQ) return;
 
     var est = document.getElementById("q_est");
     var msgEl = document.getElementById("q_msg");
     var DEFAULT_NOTE = msgEl.textContent;
+    var formWrap = document.getElementById("q_formWrap");
+    var doneWrap = document.getElementById("q_done");
+
+    var picked = { services: [], band: "", storeys: "" };
+    var photos = [];            /* uploaded urls */
+    var openedAt = Date.now();
+    var sending = false;
+    var startedSent = false;
 
     function money(n) { return "$" + Math.round(n).toLocaleString("en-AU"); }
 
-    function estimate() {
-      var n = parseInt(f.win.value, 10);
-      if (!isFinite(n) || n < 1) return null;
-      var two = f.st.value === "Two";
-      var both = f.sides.value === "Inside and out";
-      var per = (two ? RATE.two : RATE.single)[both ? "both" : "out"];
-      var floor = two ? RATE.minDouble : RATE.minSingle;
-      return Math.max(floor, n * per);
+    /* ---- the suburbs this business actually works in ---- */
+    (function () {
+      var list = document.getElementById("subList");
+      if (!list || !window.FNWCGeo) return;
+      window.FNWCGeo.suburbNames().forEach(function (s) {
+        var o = document.createElement("option");
+        o.value = s.replace(/\b[a-z]/g, function (c) { return c.toUpperCase(); });
+        list.appendChild(o);
+      });
+    })();
+
+    /* ---- the three tap-to-choose rows ---- */
+    function buildPicks(host, items, multi, onPick) {
+      items.forEach(function (it) {
+        var b = document.createElement("button");
+        b.type = "button";
+        b.textContent = it.label;
+        b.setAttribute("data-v", it.id);
+        b.setAttribute("aria-pressed", "false");
+        b.addEventListener("click", function () {
+          if (multi) {
+            var on = b.getAttribute("aria-pressed") === "true";
+            b.setAttribute("aria-pressed", on ? "false" : "true");
+          } else {
+            host.querySelectorAll("button").forEach(function (x) {
+              x.setAttribute("aria-pressed", x === b ? "true" : "false");
+            });
+          }
+          onPick();
+          formStarted();
+        });
+        host.appendChild(b);
+      });
+    }
+
+    function readPicks() {
+      var sv = document.getElementById("q_services");
+      picked.services = [].slice.call(sv.querySelectorAll('button[aria-pressed="true"]'))
+        .map(function (b) { return b.textContent; });
+      var bd = document.getElementById("q_band").querySelector('button[aria-pressed="true"]');
+      picked.band = bd ? bd.getAttribute("data-v") : "";
+      var st = document.getElementById("q_storeys").querySelector('button[aria-pressed="true"]');
+      picked.storeys = st ? st.getAttribute("data-v") : "";
+      paintEstimate();
+    }
+
+    buildPicks(document.getElementById("q_services"),
+      EQ.SERVICES.map(function (s) { return { id: s, label: s }; }), true, readPicks);
+    buildPicks(document.getElementById("q_band"),
+      EQ.BANDS.map(function (b) { return { id: b.id, label: b.label }; }), false, readPicks);
+    buildPicks(document.getElementById("q_storeys"),
+      [{ id: "Single", label: "Single storey" }, { id: "Two", label: "Two storey" }], false, readPicks);
+
+    /* ---- the indicative range ---- */
+    function payload() {
+      return {
+        name: f.name.value, phone: f.phone.value, suburb: f.sub.value,
+        services: picked.services.join(", "),
+        windows: picked.band,
+        storeys: picked.storeys,
+        notes: f.note.value
+      };
     }
 
     function paintEstimate() {
-      var e = estimate();
-      if (e == null) { est.hidden = true; return; }
+      var r = EQ.estimateRange(payload());
+      if (!r) { est.hidden = true; return; }
       est.hidden = false;
-      est.textContent = "";
-      est.appendChild(document.createTextNode("Roughly "));
+      est.innerHTML = "";
+      est.appendChild(document.createTextNode("Most places like that come in around "));
       var b = document.createElement("b");
-      b.textContent = money(e);
+      b.textContent = r.openEnded ? money(r.low) + "+" : money(r.low) + " to " + money(r.high);
       est.appendChild(b);
       est.appendChild(document.createTextNode(
-        " for that, going on the numbers above. It is a ballpark only - I confirm the real price when I see the place, and there is no charge for that."
+        ". That is a ballpark only — I confirm the real price when I see the place, and there is no charge for that."
       ));
     }
 
-    function compose() {
-      var L = ["Window cleaning enquiry"];
-      L.push("Name: " + f.name.value.trim());
-      L.push("Phone: " + f.phone.value.trim());
-      if (f.sub.value.trim()) L.push("Suburb: " + f.sub.value.trim());
-      if (f.win.value.trim()) L.push("Windows: " + f.win.value.trim());
-      L.push("Storeys: " + f.st.value);
-      L.push("Sides: " + f.sides.value);
-      if (f.note.value.trim()) L.push("Notes: " + f.note.value.trim());
-      return L.join("\n");
-    }
+    /* ---- photos, only if Firebase Storage is actually switched on ---- */
+    (function () {
+      var block = document.getElementById("q_photoBlock");
+      var input = document.getElementById("q_photos");
+      var btn = document.getElementById("q_photoBtn");
+      var shots = document.getElementById("q_shots");
+      if (!block || !input) return;
 
+      /* Ask the bucket whether it exists before offering the box at all. A
+         customer should never meet an upload button that cannot work. */
+      EQ.storageReady(window.FNWC_FIREBASE).then(function (ok) {
+        if (ok) block.hidden = false;
+      });
+
+      btn.addEventListener("click", function () { input.click(); });
+
+      input.addEventListener("change", function () {
+        var files = [].slice.call(input.files || []).slice(0, 6 - photos.length);
+        input.value = "";
+        files.forEach(function (file) {
+          var cell = document.createElement("div");
+          cell.className = "qshot busy";
+          var img = document.createElement("img");
+          cell.appendChild(img);
+          shots.appendChild(cell);
+          try { img.src = URL.createObjectURL(file); } catch (e) {}
+
+          EQ.uploadPhoto(window.FNWC_FIREBASE, file).then(function (url) {
+            photos.push(url);
+            cell.classList.remove("busy");
+            var x = document.createElement("button");
+            x.type = "button"; x.className = "x"; x.innerHTML = "&times;";
+            x.setAttribute("aria-label", "Remove photo");
+            x.addEventListener("click", function () {
+              photos = photos.filter(function (u) { return u !== url; });
+              cell.remove();
+            });
+            cell.appendChild(x);
+            EV.send("QuotePhotoAdded", {}, { once: true });
+          })["catch"](function () {
+            cell.remove();
+            say("That photo would not upload. The rest of the form still works.", "err");
+          });
+        });
+        formStarted();
+      });
+    })();
+
+    /* ---- validation ---- */
     function say(text, cls) {
       msgEl.textContent = text;
       msgEl.className = "qnote" + (cls ? " " + cls : "");
     }
 
     function valid() {
-      var ok = true;
-      [f.name, f.phone].forEach(function (el) {
-        var bad = el.value.trim().length < 2;
-        el.classList.toggle("bad", bad);
-        if (bad) ok = false;
-      });
-      if (!ok) {
-        say("I need at least your name and a number so I can get back to you.", "err");
-        (f.name.value.trim().length < 2 ? f.name : f.phone).focus();
+      var v = EQ.validate(payload());
+      [f.name, f.phone, f.sub].forEach(function (el) { el.classList.remove("bad"); });
+
+      if (!f.sub.value.trim()) {
+        f.sub.classList.add("bad");
+        say("Which suburb are you in? It tells me whether I cover you.", "err");
+        f.sub.focus();
+        return false;
       }
-      return ok;
+      if (!v.ok) {
+        var field = v.errors[0][0];
+        var el = field === "name" ? f.name : f.phone;
+        el.classList.add("bad");
+        say(v.errors[0][1], "err");
+        el.focus();
+        return false;
+      }
+      return true;
     }
 
-    [f.win, f.st, f.sides].forEach(function (el) {
-      el.addEventListener("input", paintEstimate);
-      el.addEventListener("change", paintEstimate);
-    });
-    [f.name, f.phone].forEach(function (el) {
-      el.addEventListener("input", function () { el.classList.remove("bad"); });
-    });
-
-    /* Everything the form knows, in the shape fnwc-enquiry.js expects. */
-    function payload() {
-      return {
-        name: f.name.value, phone: f.phone.value, suburb: f.sub.value,
-        windows: f.win.value, storeys: f.st.value, sides: f.sides.value,
-        notes: f.note.value
-      };
+    function formStarted() {
+      if (startedSent) return;
+      startedSent = true;
+      EV.send("QuoteFormStarted", {});
     }
+    [f.name, f.phone, f.sub, f.note].forEach(function (el) {
+      el.addEventListener("input", function () { el.classList.remove("bad"); formStarted(); });
+    });
 
-    var openedAt = Date.now();
-    var sending = false;
-
+    /* ---- sending ---- */
     var sendBtn = document.getElementById("q_send");
-    if (sendBtn && EQ) {
-      sendBtn.addEventListener("click", function () {
-        if (sending) return;
-        if (!valid()) return;
 
-        /* A bot filled the hidden box, or filled the whole form in under two
-           seconds. Say it went through and do nothing - arguing with a bot
-           only teaches it. */
-        var hp = document.getElementById("q_company");
-        if ((hp && hp.value) || Date.now() - openedAt < 2000) {
-          say("Thanks, that has gone through. Liam will get back to you shortly.", "ok");
-          return;
-        }
+    sendBtn.addEventListener("click", function () {
+      if (sending) return;
+      if (!valid()) return;
 
-        sending = true;
-        var label = sendBtn.textContent;
-        sendBtn.textContent = "Sending...";
-        sendBtn.disabled = true;
-        say("Sending it through...", "");
+      /* A bot filled the hidden box, or filled the whole form in under two
+         seconds. Say it went through and do nothing - arguing with a bot only
+         teaches it. */
+      var hp = document.getElementById("q_company");
+      if ((hp && hp.value) || Date.now() - openedAt < 2000) {
+        showDone("");
+        return;
+      }
 
-        EQ.submit(window.FNWC_FIREBASE, payload(), {
-          estimate: estimate() || 0,
-          page: location.pathname
-        }).then(function () {
-          sendBtn.textContent = "Sent";
-          say("That has gone through - it is on Liam's phone now. He will get back to you " +
-              "today or first thing tomorrow. If it is urgent, ring 0478 521 431.", "ok");
-        })["catch"](function () {
-          /* The enquiry is not lost: the visitor is handed the route that
-             never depended on this site working. */
-          sending = false;
-          sendBtn.textContent = label;
-          sendBtn.disabled = false;
-          say("That did not go through - you may be out of range. Use “Send as a text” " +
-              "below and it will reach him the moment you have signal.", "err");
+      EV.send("QuoteFormCompleted", {});
+      sending = true;
+      sendBtn.textContent = "Sending...";
+      sendBtn.disabled = true;
+      say("Sending it through...");
+
+      var data = payload();
+      var value = EQ.estimate(data);
+
+      EQ.submit(window.FNWC_FIREBASE, data, {
+        estimate: value,
+        page: location.pathname,
+        photos: photos
+      }).then(function () {
+        /* The conversion that matters. Everything else is secondary. */
+        EV.send("Lead", {
+          content_name: "Quote request",
+          value: value || 0,
+          currency: "AUD",
+          suburb: data.suburb
         });
+        EV.send("QuoteSubmitted", { value: value || 0, currency: "AUD" });
+        showDone(data.name);
+      })["catch"](function () {
+        /* The enquiry is not lost: they are handed the route that never
+           depended on this site working. */
+        sending = false;
+        sendBtn.textContent = "GET MY FREE QUOTE";
+        sendBtn.disabled = false;
+        say("That did not go through — you may be out of range. Use “Rather not fill in a form?” " +
+            "below to send it as a text, or just ring 0478 521 431.", "err");
+        var alt = document.querySelector(".qalt");
+        if (alt) alt.open = true;
       });
-    } else if (sendBtn) {
-      /* No enquiry module loaded - do not leave a dead button on the page. */
-      sendBtn.hidden = true;
+    });
+
+    function showDone(name) {
+      formWrap.hidden = true;
+      doneWrap.hidden = false;
+      var d = document.getElementById("q_doneDetail");
+      if (d) {
+        d.textContent = name
+          ? "Sent through under " + name + ". If you do not hear back, ring 0478 521 431."
+          : "";
+      }
+      try {
+        document.getElementById("qformCard").scrollIntoView({ behavior: "smooth", block: "center" });
+      } catch (e) {}
+      /* Nothing left to prompt them about. */
+      try { sessionStorage.setItem("fnwc-pop", "done"); } catch (e) {}
     }
 
+    /* ---- the fallbacks, which never needed a network ---- */
     document.getElementById("q_sms").addEventListener("click", function () {
       if (!valid()) return;
       say("Opening your messages app. Press send there and it comes straight to me.", "ok");
-      window.location.href = "sms:" + PHONE + "?&body=" + encodeURIComponent(compose());
+      EV.send("QuoteSms", {});
+      window.location.href = "sms:" + PHONE + "?&body=" + encodeURIComponent(EQ.toMessage(payload()));
     });
 
     document.getElementById("q_email").addEventListener("click", function () {
       if (!valid()) return;
       say("Opening your email. Press send there and it comes straight to me.", "ok");
+      EV.send("QuoteEmail", {});
       window.location.href = "mailto:" + EMAIL +
         "?subject=" + encodeURIComponent("Window cleaning enquiry - " + f.name.value.trim()) +
-        "&body=" + encodeURIComponent(compose());
+        "&body=" + encodeURIComponent(EQ.toMessage(payload()));
     });
 
     document.getElementById("q_copy").addEventListener("click", function () {
       if (!valid()) return;
-      var text = compose();
+      var text = EQ.toMessage(payload());
       function done() { say("Copied. Paste it into a text or email to 0478 521 431.", "ok"); }
       function fallback() { window.prompt("Copy this and send it to 0478 521 431:", text); }
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1363,12 +1723,85 @@
     });
 
     /* put the reassurance back once they start again */
-    Object.keys(f).forEach(function (k) {
-      f[k].addEventListener("focus", function () {
+    [f.name, f.phone, f.sub, f.note].forEach(function (el) {
+      el.addEventListener("focus", function () {
         if (msgEl.className !== "qnote") say(DEFAULT_NOTE);
       });
     });
   })();
+
+  /* ---- sticky call to action, phones only ---------------------------------
+     Appears once the hero is off screen, and hides again over the form so it
+     is never covering the thing it is pointing at.
+     ------------------------------------------------------------------------ */
+  (function () {
+    var quote = document.getElementById("quote");
+    var hero = document.getElementById("top");
+    if (!quote || !hero) return;
+    function update() {
+      var pastHero = window.scrollY > hero.offsetHeight * 0.7;
+      var r = quote.getBoundingClientRect();
+      var onForm = r.top < window.innerHeight && r.bottom > 0;
+      document.body.classList.toggle("show-cta", pastHero && !onForm);
+    }
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    update();
+  })();
+
+  /* ---- the quote prompt ----------------------------------------------------
+     Once per visit, never on load, and never while they are already looking at
+     the form. On a phone there is no exit intent to detect, so it waits until
+     they have read a fair way down instead.
+     ------------------------------------------------------------------------ */
+  (function () {
+    var bg = document.getElementById("popBg");
+    if (!bg) return;
+
+    var KEY = "fnwc-pop";
+    function seen() { try { return !!sessionStorage.getItem(KEY); } catch (e) { return false; } }
+    function mark() { try { sessionStorage.setItem(KEY, "1"); } catch (e) {} }
+    if (seen()) return;
+
+    var quote = document.getElementById("quote");
+    function lookingAtForm() {
+      if (!quote) return false;
+      var r = quote.getBoundingClientRect();
+      return r.top < window.innerHeight && r.bottom > 0;
+    }
+
+    var shown = false;
+    function show() {
+      if (shown || seen() || lookingAtForm()) return;
+      shown = true; mark();
+      bg.hidden = false;
+      bg.classList.add("on");
+      document.getElementById("popX").focus();
+    }
+    function hide() {
+      bg.classList.remove("on");
+      bg.hidden = true;
+    }
+
+    document.getElementById("popX").addEventListener("click", hide);
+    document.getElementById("popGo").addEventListener("click", hide);
+    bg.addEventListener("click", function (e) { if (e.target === bg) hide(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !bg.hidden) hide(); });
+
+    /* On the way out of the window, on a desktop. */
+    document.addEventListener("mouseout", function (e) {
+      if (e.clientY <= 0 && !e.relatedTarget) show();
+    });
+
+    /* Or once they have read a decent way down, on anything. */
+    var deep = false;
+    window.addEventListener("scroll", function () {
+      if (deep) return;
+      var h = document.documentElement.scrollHeight - window.innerHeight;
+      if (h > 0 && window.scrollY / h > 0.55) { deep = true; setTimeout(show, 1200); }
+    }, { passive: true });
+  })();
+
 
   /* ---- nav goes solid once you scroll ---- */
   var nav = document.getElementById("nav");
